@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $Id: utils.c,v 1.29 1994/11/17 19:44:55 ache Exp $
+ * $Id: utils.c,v 1.30 1994/11/17 23:36:49 ache Exp $
  *
  */
 
@@ -223,6 +223,8 @@ void
 Link(char *from, char *to)
 {
 	TellEm("ln %s %s", from, to);
+	if(fixit)
+	    unlink(to);
 	if (link(from, to) == -1)
 		Fatal("Couldn't create link: %s -> %s\n", from, to);
 }
@@ -269,6 +271,7 @@ void
 CleanMount(int disk, int part)
 {
     int i = MP[disk][part];
+    Faction[i] = 0;
     if (Fmount[i]) {
         free(Fmount[i]);
         Fmount[i] = 0;
@@ -304,12 +307,16 @@ SetMount(int disk, int part, char *path)
     switch (Dlbl[disk]->d_partitions[part].p_fstype) {
 	case FS_BSDFFS:
 	    Ftype[k] = StrAlloc("ufs");
+	    if(!fixit)
+		Faction[k] = 1;
 	    break;
 	case FS_MSDOS:
 	    Ftype[k] = StrAlloc("msdos");
+	    Faction[k] = 0;
 	    break;
 	case FS_SWAP:
 	    Ftype[k] = StrAlloc("swap");
+	    Faction[k] = 1;
 	    break;
 	default:
 	    CleanMount(disk,part);
@@ -320,3 +327,20 @@ SetMount(int disk, int part, char *path)
     MP[disk][part] = k;
     return NULL;
 }
+
+void
+enable_label(int fd)
+{ 
+	int flag = 1;
+	if (ioctl(fd, DIOCWLABEL, &flag) < 0) 
+	    Fatal("ioctl(DIOCWLABEL,1) failed: %s",strerror(errno));
+}
+
+void
+disable_label(int fd)
+{  
+	int flag = 0;
+	if (ioctl(fd, DIOCWLABEL, &flag) < 0) 
+	    Fatal("ioctl(DIOCWLABEL,0) failed: %s",strerror(errno));
+}
+
