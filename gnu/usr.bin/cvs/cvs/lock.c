@@ -315,8 +315,7 @@ write_lock (repository)
 	    /* clean up the lock dir if we created it */
 	    if (status == L_OK)
 	    {
-		if (rmdir (tmp) < 0)
-		    error (0, errno, "failed to remove lock dir `%s'", tmp);
+		clear_lock();
 	    }
 
 	    /* indicate we failed due to read locks instead of error */
