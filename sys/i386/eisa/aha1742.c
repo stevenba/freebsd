@@ -14,7 +14,7 @@
  *
  * commenced: Sun Sep 27 18:14:01 PDT 1992
  *
- *	$Id: aha1742.c,v 1.9 1993/08/28 03:07:40 rgrimes Exp $
+ *	$Id: aha1742.c,v 1.9.2.1 1993/09/21 22:28:57 rgrimes Exp $
  */
 
 #include <sys/types.h>
@@ -891,7 +891,7 @@ int	unit;
 	DELAY(10000);
 	while(--wait)
 	{
-		if(inb(stport) & G2STAT_BUSY )
+		if((inb(stport) & G2STAT_BUSY ) == 0)
 			break;
 		DELAY(1000);
 	}
