@@ -426,7 +426,6 @@ do_dir_proc (p, closure)
     void *closure;
 {
     char *dir = p->key;
-    char savewd[PATH_MAX];
     char newrepos[PATH_MAX];
     List *sdirlist;
     char *srepository;
@@ -434,6 +433,11 @@ do_dir_proc (p, closure)
     Dtype dir_return = R_PROCESS;
     int stripped_dot = 0;
     int err = 0;
+#ifndef HAVE_FCHDIR
+    char savewd[PATH_MAX];
+#else
+    int savefd;
+#endif
 
     /* set up update_dir - skip dots if not at start */
     if (strcmp (dir, ".") != 0)
@@ -477,8 +481,13 @@ do_dir_proc (p, closure)
     if (dir_return != R_SKIP_ALL)
     {
 	/* save our current directory and static vars */
+#ifdef HAVE_FCHDIR
+	if ((savefd = open (".", O_RDONLY)) < 0)
+	    error (1, errno, "could not open working directory");
+#else
 	if (getwd (savewd) == NULL)
 	    error (1, 0, "could not get working directory: %s", savewd);
+#endif
 	sdirlist = dirlist;
 	srepository = repository;
 	dirlist = NULL;
@@ -511,8 +520,14 @@ do_dir_proc (p, closure)
 	    err = dirleaveproc (dir, err, update_dir);
 
 	/* get back to where we started and restore state vars */
+#ifdef HAVE_FCHDIR
+	if (fchdir (savefd) < 0) 
+	    error (1, errno, "could not fchdir back to saved working directory");
+	(void) close (savefd);
+#else
 	if (chdir (savewd) < 0)
 	    error (1, errno, "could not chdir to %s", savewd);
+#endif
 	dirlist = sdirlist;
 	repository = srepository;
     }
@@ -577,8 +592,12 @@ unroll_files_proc (p, closure)
     struct recursion_frame *frame = (struct recursion_frame *) closure;
     int err = 0;
     List *save_dirlist;
-    char savewd[PATH_MAX];
     char *save_update_dir = NULL;
+#ifndef HAVE_FCHDIR
+    char savewd[PATH_MAX];
+#else
+    int savefd;
+#endif
 
     /* if this dir was also an explicitly named argument, then skip
        it.  We'll catch it later when we do dirs. */
@@ -593,8 +612,13 @@ unroll_files_proc (p, closure)
 
     if (strcmp(p->key, ".") != 0)
     {
+#ifdef HAVE_FCHDIR
+	if ((savefd = open (".", O_RDONLY)) < 0)
+	    error (1, errno, "could not open working directory");
+#else
 	if (getwd (savewd) == NULL)
 	    error (1, 0, "could not get working directory: %s", savewd);
+#endif
 
 	if (chdir (p->key) < 0)
 	    error (1, errno, "could not chdir to %s", p->key);
@@ -617,8 +641,14 @@ unroll_files_proc (p, closure)
 	(void) strcpy (update_dir, save_update_dir);
 	free (save_update_dir);
 
+#ifdef HAVE_FCHDIR
+	if (fchdir (savefd) < 0) 
+	    error (1, errno, "could not fchdir back to saved working directory");
+	(void) close (savefd);
+#else
 	if (chdir (savewd) < 0)
 	    error (1, errno, "could not chdir to %s", savewd);
+#endif
     }
 
     dirlist = save_dirlist;
