@@ -1,4 +1,4 @@
-#! /bin/sh -x
+#! /bin/sh
 :
 #
 # Copyright (c) 1992, Brian Berliner
@@ -237,5 +237,9 @@ mkmodules $CVSROOT/CVSROOT
 if [ $remind_cvsroot = yes ]; then
     echo "Remember to set the CVSROOT environment variable in your login script"
 fi
+
+# Tell them where they can find more advanced examples                  
+echo "For more advanced examples of files which are used for checkin/checkout"
+echo "look in /usr/share/examples/cvs"
 
 exit 0
