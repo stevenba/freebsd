@@ -1,20 +1,20 @@
 #	From: @(#)Makefile	8.2 (Berkeley) 1/4/94
-#	$Id: Makefile,v 1.18 1994/10/31 00:42:20 ats Exp $
+#	$Id: Makefile,v 1.12 1994/09/08 10:36:30 bde Exp $
 #
 # Doing a make install builds /usr/include
 #
 # The ``rm -rf''s used below are safe because rm doesn't follow symbolic
 # links.
 #
-all depend lint tags:
+all clean cleandir depend lint tags:
 
 SUBDIR= rpcsvc
 # XXX MISSING:	mp.h
 FILES=	a.out.h ar.h assert.h bitstring.h ctype.h db.h dirent.h disktab.h \
-	err.h f2c.h fnmatch.h fstab.h fts.h glob.h grp.h histedit.h kvm.h \
+	err.h fnmatch.h fstab.h fts.h glob.h grp.h histedit.h kvm.h \
 	limits.h link.h locale.h memory.h mpool.h ndbm.h \
 	netdb.h nlist.h paths.h pwd.h ranlib.h regex.h regexp.h \
-	resolv.h rune.h runetype.h setjmp.h sgtty.h signal.h \
+	resolv.h rune.h runetype.h setjmp.h sgtty.h signal.h skey.h \
 	stab.h stddef.h stdio.h stdlib.h string.h strings.h struct.h \
 	sysexits.h tar.h time.h ttyent.h tzfile.h unistd.h utime.h \
 	utmp.h vis.h
@@ -22,7 +22,7 @@ FILES=	a.out.h ar.h assert.h bitstring.h ctype.h db.h dirent.h disktab.h \
 FILES+=	math.h
 .endif
 
-MFILES=	float.h floatingpoint.h stdarg.h varargs.h
+MFILES=	float.h floatingpoint.h frame.h stdarg.h varargs.h
 LFILES=	errno.h fcntl.h syslog.h termios.h
 
 DIRS=	arpa protocols rpc
@@ -38,23 +38,20 @@ NOOBJ=	noobj
 # SHARED=	copies
 SHARED?=	symlinks
 
-OSREL	= ${DESTDIR}/usr/include/osreldate.h
 beforeinstall: ${SHARED}
 	@${ECHO} installing ${FILES}
 	@-for i in ${FILES}; do \
-		cmp -s $$i ${DESTDIR}/usr/include/$$i || \
+		cmp -s $$i ${DESTDIR}/usr/include/$$i > /dev/null 2>&1 || \
 		    install -c -o ${BINOWN} -g ${BINGRP} -m 444 $$i \
 		    ${DESTDIR}/usr/include/$$i; \
 	done
 	@${ECHO} creating osreldate.h
-	@echo \#'undef __FreeBSD_version' > ${OSREL}.new
+	@rm -f ${DESTDIR}/usr/include/osreldate.h
+	@echo \#'undef __FreeBSD_version' > ${DESTDIR}/usr/include/osreldate.h
 	@echo \#'define __FreeBSD_version '`sysctl -n kern.osreldate` \
-		>> ${OSREL}.new
-	@if cmp -s ${OSREL} ${OSREL}.new ; then \
-		rm -f ${OSREL}.new ; else \
-		mv -f ${OSREL}.new ${OSREL} ; fi
-	@chown ${BINOWN}.${BINGRP} ${OSREL}
-	@chmod 444 ${OSREL}
+		>> ${DESTDIR}/usr/include/osreldate.h
+	@chown ${BINOWN}.${BINGRP} ${DESTDIR}/usr/include/osreldate.h
+	@chmod 444 ${DESTDIR}/usr/include/osreldate.h
 	@${ECHO} installing ${DIRS}
 	@-for i in ${DIRS}; do \
 		if [ ! -d ${DESTDIR}/usr/include/$$i ]; \
@@ -64,7 +61,8 @@ beforeinstall: ${SHARED}
 		chown ${BINOWN}.${BINGRP} ${DESTDIR}/usr/include/$$i; \
 		chmod 755 ${DESTDIR}/usr/include/$$i; \
 		(cd $$i; for j in *.[ih]; do \
-			cmp -s $$j ${DESTDIR}/usr/include/$$i/$$j || \
+			cmp -s $$j ${DESTDIR}/usr/include/$$i/$$j > \
+			    /dev/null 2>&1 || \
 			    install -c -o ${BINOWN} -g ${BINGRP} -m 444 $$j \
 			    ${DESTDIR}/usr/include/$$i/$$j; \
 		done); \

@@ -24,8 +24,8 @@
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)$Id: getnetnamadr.c,v 1.1 1994/09/25 02:12:29 pst Exp $";
-static char rcsid[] = "$Id: getnetnamadr.c,v 1.1 1994/09/25 02:12:29 pst Exp $";
+static char sccsid[] = "@(#)$Id$";
+static char rcsid[] = "$Id$";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/param.h>
@@ -45,9 +45,7 @@ extern struct netent * _getnetbyhtaddr  __P((long, int));
 extern struct netent * _getnetbydnsaddr __P((long, int));
 extern struct netent * _getnetbynisaddr __P((long, int));
 
-#ifndef _PATH_NETCONF
-#define _PATH_NETCONF	"/etc/host.conf"
-#endif
+#define _PATH_NETCONF	"/etc/net.conf"
 
 enum service_type { 
   SERVICE_NONE = 0,
@@ -60,10 +58,10 @@ static struct {
   const char *name;
   enum service_type type;
 } service_names[] = {
-  { "hosts", SERVICE_TABLE },
-  { "/etc/hosts", SERVICE_TABLE },
-  { "hosttable", SERVICE_TABLE },
-  { "htable", SERVICE_TABLE },
+  { "nets", SERVICE_TABLE },
+  { "/etc/nets", SERVICE_TABLE },
+  { "nettable", SERVICE_TABLE },
+  { "ntable", SERVICE_TABLE },
   { "bind", SERVICE_BIND },
   { "dns", SERVICE_BIND },
   { "domain", SERVICE_BIND },
