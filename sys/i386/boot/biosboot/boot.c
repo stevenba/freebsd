@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, [92/04/03  16:51:14  rvb]
- *	$Id: boot.c,v 1.56.2.4 1996/09/08 03:17:47 julian Exp $
+ *	$Id: boot.c,v 1.56.2.5 1996/09/08 04:30:05 julian Exp $
  */
 
 
@@ -139,7 +139,7 @@ boot(int drive)
 #endif	/*NAMEBLOCK*/
 loadstart:
 	name = dflname;
-	bcopy(name,namebuf,128); /* really want strcpy but why bloat? */
+	bcopy(name,namebuf,32); /* really want strcpy but why bloat? */
 	/* print this all each time.. (saves space to do so) */
 	/* If we have looped, use the previous entries as defaults */
 	printf("\n>> FreeBSD BOOT @ 0x%x: %d/%d k of memory\n"
