@@ -1,6 +1,0 @@
-#!/usr/local/bin/tclsh
-
-set CTMname	smp-cur
-set CTMref	/home/smp
-set CTMdont	{\.core$|^/CVSROOT/history.*$|/#cvs|/\.#|^/CVSROOT/val-tags$}
-set CTMmail	smp-cvs-cur@freebsd.org
