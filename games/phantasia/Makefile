@@ -2,8 +2,8 @@
 
 PROG=	phantasia
 SRCS=	main.c fight.c io.c interplayer.c gamesupport.c misc.c phantglobs.c
-DPADD=	${LIBM} ${LIBCURSES} ${LIBTERMCAP} ${LIBCOMPAT}
-LDADD=	-lm -lcurses -ltermcap -lcompat
+DPADD=	${LIBM} ${LIBCURSES} ${LIBTERM} ${LIBCOMPAT}
+LDADD=	-lm -lcurses -ltermlib -lcompat
 HIDEGAME=hidegame
 MAN6=	phantasia.6
 CLEANFILES+=map setup setup.o
@@ -15,14 +15,7 @@ setup: phantglobs.o setup.o monsters.asc ${LIBM}
 
 beforeinstall: 
 	./setup -m ${.CURDIR}/monsters.asc
-	install -c -m 660 -o games -g bin gold ${DESTDIR}/var/games/phantasia
-	install -c -m 660 -o games -g bin lastdead ${DESTDIR}/var/games/phantasia
-	install -c -m 660 -o games -g bin mess ${DESTDIR}/var/games/phantasia
-	install -c -m 660 -o games -g bin monsters ${DESTDIR}/var/games/phantasia
-	install -c -m 660 -o games -g bin motd ${DESTDIR}/var/games/phantasia
-	install -c -m 660 -o games -g bin characs ${DESTDIR}/var/games/phantasia
-	install -c -m 660 -o games -g bin scoreboard ${DESTDIR}/var/games/phantasia
-	install -c -m 660 -o games -g bin void ${DESTDIR}/var/games/phantasia
+	chown games.bin /var/games/phantasia/*
 
 # Make Phantasia map.  Change the map commands reflect your installation.
 # PLOTDEVICE is used for plotting the map.  Change as appropriate.

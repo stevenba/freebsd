@@ -108,7 +108,6 @@ char *sfile;
 			sfile = name_buffer;
 		}
 	}
-	setuid(getuid());
 	if (	((fp = fopen(sfile, "w")) == NULL) ||
 			((file_id = md_get_file_id(sfile)) == -1)) {
 		message("problem accessing the save file", 0);
@@ -160,14 +159,6 @@ char *sfile;
 	} else {
 		clean_up("");
 	}
-}
-
-static char save_name[80];
-
-static del_save_file()
-{
-	setuid(getuid());
-	md_df(save_name);
 }
 
 restore(fname)
@@ -242,9 +233,8 @@ char *fname;
 		clear();
 		clean_up("sorry, file has been touched");
 	}
-	if ((!wizard)) {
-		strcpy(save_name, fname);
-		atexit(del_save_file);
+	if ((!wizard) && !md_df(fname)) {
+		clean_up("cannot delete file");
 	}
 	msg_cleared = 0;
 	ring_stats(0);

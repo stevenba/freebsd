@@ -2,7 +2,7 @@
 
 PROG=	canfield
 MAN6=	canfield.6
-DPADD=	${LIBCURSES} ${LIBTERMCAP} ${LIBCOMPAT}
+DPADD=	${LIBCURSES} ${LIBTERM} ${LIBCOMPAT}
 LDADD=	-lcurses -ltermcap -lcompat
 HIDEGAME=hidegame
 
