@@ -76,22 +76,21 @@ static void loadprog(void);
 void
 boot(int drive)
 {
-	char *ptr;
-	int	howto;
+	register int *howto = &loadflags;
 	char c;
 	int ret;
 
 #ifdef PROBE_KEYBOARD
 	if (probe_keyboard()) {
 		init_serial();
-		loadflags = RB_SERIAL;
+		*howto = RB_SERIAL;
 		printf("\nNo keyboard found.");
 	}
 #endif
 
 #ifdef FORCE_COMCONSOLE
 	init_serial();
-	loadflags = RB_SERIAL;
+	*howto = RB_SERIAL;
 	printf("\nSerial console forced.");
 #endif
 
@@ -155,73 +154,76 @@ loadstart:
 	/*
 	 * Be paranoid and make doubly sure that the input buffer is empty.
 	 */
-	if(howto = (loadflags &= RB_SERIAL))
+	if(*howto &= RB_SERIAL)
 		init_serial();	/* clear all, but leave serial console */
 
 	if (!gets(namebuf)) {
 		putchar('\n');
 	}
-	ptr = namebuf;
-	/*
-	 * now parse out the boot options from what was given to us
-	 * (or was read from the default string)
-	 */
-	while ((c = *ptr) != '\0') {
+	{ /* delclare a local variable here to force Gcc's hand (make it a reg) */
+		char *ptr;
+
+		ptr = namebuf;
 		/*
-		 * pass any leading (or inter-arg) spaces
-		 */
-		if (c == ' ') {
-			ptr++;
-			continue;
-		}
-		/*
-		 * If it's an arg, take as many letters as we can
-		 */
-		if (c == '-') {
-			while ((c = *++ptr) != '\0') {
-				if (c == ' ')
-					break;
-				if (c == 'C')
-					howto |= RB_CDROM;
-				if (c == 'a')
-					howto |= RB_ASKNAME;
-				if (c == 'b')
-					howto |= RB_HALT;
-				if (c == 'c')
-					howto |= RB_CONFIG;
-				if (c == 'd')
-					howto |= RB_KDB;
-				if (c == 'h') {
-					howto ^= RB_SERIAL;
-					if (howto & RB_SERIAL)
-						init_serial();
-				}
-				if (c == 'g')
-					howto |= RB_GDB;
-				if (c == 'r')
-					howto |= RB_DFLTROOT;
-				if (c == 's')
-					howto |= RB_SINGLE;
-				if (c == 'v')
-					howto |= RB_VERBOSE;
-			}
-			continue;
-		} 
-		/*
-		 * we have struck something that's not an arg,
-		 * nor a space.
-		 * break it off into a separate string.. "name"
-		 * The default string will at least hit this..
-		 */
-		name = ptr;
-		while (*++ptr != '\0') {
+	 	* now parse out the boot options from what was given to us
+	 	* (or was read from the default string)
+	 	*/
+		while (*ptr != '\0') {
+			/*
+			 * pass any leading (or inter-arg) spaces
+			 */
 			if (*ptr == ' ') {
-				*ptr++ = '\0';
-				break;
+				ptr++;
+				continue;
+			}
+				/*
+			 * If it's an arg, take as many letters as we can
+			 */
+			if (*ptr == '-') {
+				while (( *++ptr) != '\0') {
+					if (*ptr == ' ')
+						break;
+					if (*ptr == 'C')
+						*howto |= RB_CDROM;
+					if (*ptr == 'a')
+						*howto |= RB_ASKNAME;
+					if (*ptr == 'b')
+						*howto |= RB_HALT;
+					if (*ptr == 'c')
+						*howto |= RB_CONFIG;
+					if (*ptr == 'd')
+						*howto |= RB_KDB;
+					if (*ptr == 'h') {
+						*howto ^= RB_SERIAL;
+						if (*howto & RB_SERIAL)
+							init_serial();
+					}
+					if (*ptr == 'g')
+						*howto |= RB_GDB;
+					if (*ptr == 'r')
+						*howto |= RB_DFLTROOT;
+					if (*ptr == 's')
+						*howto |= RB_SINGLE;
+					if (*ptr == 'v')
+						*howto |= RB_VERBOSE;
+				}
+			} else {
+				/*
+				 * we have struck something that's not an arg,
+				 * nor a space.
+				 * break it off into a separate string.. "name"
+				 * The default string will at least hit this..
+				 */
+				name = ptr;
+				while (*++ptr != '\0') {
+					if (*ptr == ' ') {
+						*ptr++ = '\0';
+						break;
+					}
+				}
 			}
 		}
 	}
-	loadflags = howto;
 	/*
 	 * Now use "name" to try open the device and file for reading
 	 */
