@@ -1,8 +1,0 @@
-#!/usr/bin/perl
-
-# $Header: /pub/FreeBSD/FreeBSD-CVS/src/gnu/usr.bin/perl/eg/ADB,v 1.1.1.1 1994/09/10 06:27:46 gclarkii Exp $
-
-# This script is only useful when used in your crash directory.
-
-$num = shift;
-exec 'adb', '-k', "vmunix.$num", "vmcore.$num";
