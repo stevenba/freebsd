@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $Id: stage2.c,v 1.15 1994/11/17 19:44:53 ache Exp $
+ * $Id: stage2.c,v 1.16 1994/11/18 11:30:04 phk Exp $
  *
  */
 
@@ -36,11 +36,9 @@ stage2()
     FILE *f1;
     int i, j;
 
-    if (dialog_yesno("Last Chance!", "Are you sure you want to proceed with the installation?\nLast chance before wiping your hard disk!", -1, -1))
-	exit(0);
-    /* Sort in mountpoint order */
     memset(Fsize, 0, sizeof Fsize);
 
+    /* Sort in mountpoint order */
     for (i = 1; Fname[i]; i++)
 	Fsize[i] = i;
     Fsize[i] = 0;
@@ -58,12 +56,19 @@ stage2()
 	if (strcmp(Ftype[Fsize[j]], "ufs")) 
 	    continue;
 	p = Fname[Fsize[j]];
-	TellEm("newfs /dev/r%s",p); 
 	strcpy(pbuf, "/dev/r");
 	strcat(pbuf, p);
-	i = exec(0, "/stand/newfs", "/stand/newfs", "-n", "1", pbuf, 0);
-	if (i) 
-	    Fatal("Exec(/stand/newfs) failed, code=%d.",i);
+	if (!Faction[Fsize[j]]) {
+		TellEm("fsck -y /dev/r%s",p); 
+		i = exec(0, "/stand/fsck", "/stand/fsck", "-y", pbuf, 0);
+		if (i) 
+		    Fatal("Exec(/stand/fsck) failed, code=%d.",i);
+	} else {
+		TellEm("newfs /dev/r%s",p); 
+		i = exec(0, "/stand/newfs", "/stand/newfs", "-n", "1", pbuf, 0);
+		if (i) 
+		    Fatal("Exec(/stand/newfs) failed, code=%d.",i);
+	}
     }
 
     for (j = 1; Fsize[j]; j++) {
@@ -95,6 +100,30 @@ stage2()
     Link("/mnt/stand/sysinstall","/mnt/stand/newfs");
     Link("/mnt/stand/sysinstall","/mnt/stand/fsck");
     Link("/mnt/stand/sysinstall","/mnt/stand/dialog");
+
+    if (fixit) {
+	for (i=0;i<100;i++) {
+	    sprintf(pbuf,"/mnt/etc/fstab.before.fixit.%d",i);
+	    if (access(pbuf,R_OK)) {
+		rename("/mnt/etc/fstab",pbuf);
+		break;
+	    }
+	}
+	for (i=0;i<100;i++) {
+	    sprintf(pbuf,"/mnt/kernel.before.fixit.%d",i);
+	    if (access(pbuf,R_OK)) {
+		rename("/mnt/kernel",pbuf);
+		break;
+	    }
+	}
+	for (i=0;i<100;i++) {
+	    sprintf(pbuf,"/mnt/sbin/init.before.fixit.%d",i);
+	    if (access(pbuf,R_OK)) {
+		rename("/mnt/sbin/init",pbuf);
+		break;
+	    }
+	}
+    }
 
     CopyFile("/kernel","/mnt/kernel");
     TellEm("make /dev entries");
@@ -138,6 +167,6 @@ stage2()
 	/* Don't do error-check, we reboot anyway... */
 	unmount(dbuf, 0);
     }
-    dialog_msgbox(TITLE,"Remove the floppy from the drive and hit return to reboot from the hard disk", -1, -1, 1);
+    dialog_msgbox(TITLE,"Remove the floppy from the drive\n and hit return to reboot from the hard disk", -1, -1, 1);
     dialog_clear();
 }
