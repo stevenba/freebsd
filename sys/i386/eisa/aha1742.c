@@ -14,7 +14,7 @@
  *
  * commenced: Sun Sep 27 18:14:01 PDT 1992
  *
- *	$Id: aha1742.c,v 1.9.2.1 1993/09/21 22:28:57 rgrimes Exp $
+ *	$Id: aha1742.c,v 1.9.2.2 1993/09/21 23:03:42 rgrimes Exp $
  */
 
 #include <sys/types.h>
@@ -1256,10 +1256,11 @@ cheat = ecb;
 ahb_timeout(struct ecb *ecb)
 {
 	int	unit;
-	struct	ahb_data *ahb = ahbdata[unit];
+	struct	ahb_data *ahb ;
 	int	s	= splbio();
 
 	unit = ecb->xs->sc_id->adapter_unit;
+	ahb = ahbdata[unit];
 	printf("ahb%d:%d device timed out\n",unit
 			,ecb->xs->sc_id->target);
 #ifdef	AHBDEBUG
