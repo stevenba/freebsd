@@ -1,5 +1,5 @@
-/*
- * authspeed - figure out how long it takes to do an NTP encryption
+/* authspeed.c,v 3.1 1993/07/06 01:04:54 jbj Exp
+ * authspeed - figure out how LONG it takes to do an NTP encryption
  */
 
 #if defined(SYS_HPUX) || defined(SYS_AUX3) || defined(SYS_AUX2) || defined(SOLARIS) || defined(SYS_SVR4) || defined(SYS_PTX) || defined(SYS_UNIXWARE1)
@@ -38,7 +38,7 @@ struct rusage rstart, rend;
 #endif
 
 l_fp dummy1, dummy2;
-u_long dummy3;
+U_LONG dummy3;
 
 U_LONG pkt[15];
 
@@ -299,8 +299,8 @@ subtime(tvs, tve, res)
 	struct timeval *tvs, *tve;
 	double *res;
 {
-	long sec;
-	long usec;
+	LONG sec;
+	LONG usec;
 
 	sec = tve->tv_sec - tvs->tv_sec;
 	usec = tve->tv_usec - tvs->tv_usec;

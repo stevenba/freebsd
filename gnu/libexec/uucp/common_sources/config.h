@@ -26,7 +26,7 @@
 #define HAVE_TIME_H 1 /* <time.h> */
 #define HAVE_SYS_WAIT_H 1 /* <sys/wait.h> */
 #define HAVE_SYS_IOCTL_H 1 /* <sys/ioctl.h> */
-#define HAVE_DIRENT_H 1 /* <dirent.h> */
+#define HAVE_DIRENT_H 0 /* <dirent.h> */
 #define HAVE_MEMORY_H 1 /* <memory.h> */
 #define HAVE_SYS_PARAM_H 1 /* <sys/param.h> */
 #define HAVE_UTIME_H 1 /* <utime.h> */
@@ -124,7 +124,7 @@
 
 /* Set HAVE_SIG_ATOMIC_T_IN_SIGNAL_H if the type sig_atomic_t is defined
    in <signal.h> as required by ANSI C.  */
-#define HAVE_SIG_ATOMIC_T_IN_SIGNAL_H 1
+#define HAVE_SIG_ATOMIC_T_IN_SIGNAL_H 0
 
 /* Set HAVE_SIG_ATOMIC_T_IN_TYPES_H if the type sig_atomic_t is defined
    in <sys/types.h>.  This is ignored if HAVE_SIG_ATOMIC_T_IN_SIGNAL_H is
@@ -185,8 +185,8 @@
    STAT_DISK_SPACE	 disk_space function (QNX)
    STAT_USTAT            the ustat function with 512 byte blocks.  */
 #define STAT_STATVFS 0
-#define STAT_STATFS2_BSIZE 1
-#define STAT_STATFS2_FSIZE 0
+#define STAT_STATFS2_BSIZE 0
+#define STAT_STATFS2_FSIZE 1
 #define STAT_STATFS2_FS_DATA 0
 #define STAT_STATFS4 0
 #define STAT_DUSTAT 0

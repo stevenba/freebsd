@@ -1,4 +1,4 @@
-#       $Id: Makefile,v 1.15 1994/11/01 09:13:02 pst Exp $
+#       $Id: Makefile,v 1.12 1994/06/11 15:18:01 paul Exp $
 
 
 CFLAGS+= -I${.CURDIR} -DVOID_SIGHANDLER \
@@ -11,7 +11,6 @@ SRCS+=  readline.c funmap.c keymaps.c vi_mode.c parens.c \
 	   history.c search.c tilde.c xmalloc.c
 HEADERS= history.h readline.h keymaps.h chardefs.h tilde.h
 NOMAN=	noman
-LDADD+= -ltermcap
 
 beforeinstall:
 	@-if [ ! -d ${DESTDIR}/usr/include/readline ]; then \
@@ -20,10 +19,7 @@ beforeinstall:
 	  chmod 755 ${DESTDIR}/usr/include/readline; \
 	fi
 	cd ${.CURDIR}/readline; \
-	for m in ${HEADERS} ; do \
-	  cmp -s $$m ${DESTDIR}/usr/include/readline || \
-	  install -c -o ${BINOWN} -g ${BINGRP} -m 444 \
-		$$m ${DESTDIR}/usr/include/readline ; \
-	done
+	install -c -o ${BINOWN} -g ${BINGRP} -m 444 \
+		${HEADERS} ${DESTDIR}/usr/include/readline
 
 .include <bsd.lib.mk>

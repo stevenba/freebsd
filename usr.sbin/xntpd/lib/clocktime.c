@@ -1,4 +1,4 @@
-/*
+/* clocktime.c,v 3.1 1993/07/06 01:08:07 jbj Exp
  * clocktime - compute the NTP date from a day of year, hour, minute
  *	       and second.
  */
@@ -34,21 +34,21 @@ clocktime(yday, hour, minute, second, tzoff, rec_ui, yearstart, ts_ui)
 	int minute;
 	int second;
 	int tzoff;
-	u_long rec_ui;
-	u_long *yearstart;
+	U_LONG rec_ui;
+	U_LONG *yearstart;
 	U_LONG *ts_ui;
 {
-	register long tmp;
-	register u_long date;
-	register u_long yst;
+	register LONG tmp;
+	register U_LONG date;
+	register U_LONG yst;
 
 	/*
 	 * Compute the offset into the year in seconds.  Note that
 	 * this could come out to be a negative number.
 	 */
-	tmp = (long)(MULBY24((yday-1)) + hour + tzoff);
-	tmp = MULBY60(tmp) + (long)minute;
-	tmp = MULBY60(tmp) + (long)second;
+	tmp = (LONG)(MULBY24((yday-1)) + hour + tzoff);
+	tmp = MULBY60(tmp) + (LONG)minute;
+	tmp = MULBY60(tmp) + (LONG)second;
 
 	/*
 	 * Initialize yearstart, if necessary.
@@ -66,7 +66,7 @@ clocktime(yday, hour, minute, second, tzoff, rec_ui, yearstart, ts_ui)
 	 * Use the current year start for the first check, this should
 	 * work most of the time.
 	 */
-	date = (u_long)(tmp + (long)yst);
+	date = (U_LONG)(tmp + (LONG)yst);
 	if (date < (rec_ui + CLOSETIME) &&
 	    date > (rec_ui - CLOSETIME)) {
 		*ts_ui = date;
@@ -79,7 +79,7 @@ clocktime(yday, hour, minute, second, tzoff, rec_ui, yearstart, ts_ui)
 	 */
 	yst = calyearstart(rec_ui);
 	if (yst != *yearstart) {
-		date = (u_long)((long)yst + tmp);
+		date = (U_LONG)((LONG)yst + tmp);
 		*ts_ui = date;
 		if (date < (rec_ui + CLOSETIME) &&
 		    date > (rec_ui - CLOSETIME)) {
@@ -98,7 +98,7 @@ clocktime(yday, hour, minute, second, tzoff, rec_ui, yearstart, ts_ui)
 	if ((rec_ui - yst) < TWODAYS) {
 		yst = calyearstart(yst - TWODAYS);
 		if (yst != *yearstart) {
-			date = (u_long)(tmp + (long)yst);
+			date = (U_LONG)(tmp + (LONG)yst);
 			if (date < (rec_ui + CLOSETIME) &&
 			    date > (rec_ui - CLOSETIME)) {
 				*yearstart = yst;
@@ -115,7 +115,7 @@ clocktime(yday, hour, minute, second, tzoff, rec_ui, yearstart, ts_ui)
 	 */
 	yst = calyearstart(rec_ui + TWODAYS);
 	if (yst != *yearstart) {
-		date = (u_long)((long)yst + tmp);
+		date = (U_LONG)((LONG)yst + tmp);
 		if (date < (rec_ui + CLOSETIME) &&
 		    date > (rec_ui - CLOSETIME)) {
 			*yearstart = yst;

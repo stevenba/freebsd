@@ -1,8 +1,8 @@
 #if defined(REFCLOCK) && (defined(PARSE) || defined(PARSEPPS))
 /*
- * /src/NTP/REPOSITORY/v3/parse/parse.c,v 3.27 1994/06/01 08:18:33 kardel Exp
+ * /src/NTP/REPOSITORY/v3/parse/parse.c,v 3.23 1994/03/25 13:09:02 kardel Exp
  *  
- * parse.c,v 3.27 1994/06/01 08:18:33 kardel Exp
+ * parse.c,v 3.23 1994/03/25 13:09:02 kardel Exp
  *
  * Parser module for reference clock
  *
@@ -64,7 +64,7 @@ static char rcsid[] = "parse.c,v 3.19 1994/01/25 19:05:20 kardel Exp";
 extern clockformat_t *clockformats[];
 extern unsigned short nformats;
 
-static u_long timepacket();
+static unsigned LONG timepacket();
 
 /*
  * strings support usually not in kernel - duplicated, but what the heck
@@ -120,9 +120,9 @@ timedout(parseio, ctime)
       delta.tv_usec += 1000000;
     }
 #else
-  extern long tstouslo[];
-  extern long tstousmid[];
-  extern long tstoushi[];
+  extern LONG tstouslo[];
+  extern LONG tstousmid[];
+  extern LONG tstoushi[];
 
   l_fp delt;
 
@@ -145,8 +145,6 @@ timedout(parseio, ctime)
 
 /*
  * setup_bitmaps
- * WARNING: NOT TO BE CALLED CONCURRENTLY WITH
- *          parse_ioread, parse_ioend, parse_ioinit
  */
 static int
 setup_bitmaps(parseio, low, high)
@@ -157,7 +155,7 @@ setup_bitmaps(parseio, low, high)
   register unsigned short i;
   register int f = 0;
   register clockformat_t *fmt;
-  register unsigned short index, mask, plen;
+  register unsigned index, mask;
 
   if ((low >= high) ||
       (high > nformats))
@@ -169,9 +167,6 @@ setup_bitmaps(parseio, low, high)
   bzero(parseio->parse_startsym, sizeof (parseio->parse_startsym));
   bzero(parseio->parse_endsym, sizeof (parseio->parse_endsym));
   bzero(parseio->parse_syncsym, sizeof (parseio->parse_syncsym));
-
-  plen = 0;
-
   parseio->parse_syncflags = 0;
   parseio->parse_timeout.tv_sec = 0;
   parseio->parse_timeout.tv_usec = 0;
@@ -184,16 +179,13 @@ setup_bitmaps(parseio, low, high)
       fmt = clockformats[i];
 
       if (!(parseio->parse_flags & PARSE_FIXED_FMT) &&
-	   (fmt->flags & CVT_FIXEDONLY)) {
-        if (parseio->parse_dsize < fmt->length)
-	  parseio->parse_dsize = fmt->length;
+	   (fmt->flags & CVT_FIXEDONLY))
 	continue;
-      }
       
       if (fmt->flags & F_START)
 	{
-	  index = fmt->startsym >> 3;
-	  mask  = 1 << (fmt->startsym & 0x7);
+	  index = fmt->startsym / 8;
+	  mask  = 1 << (fmt->startsym % 8);
 
 	  if (parseio->parse_endsym[index] & mask)
 	    {
@@ -213,8 +205,8 @@ setup_bitmaps(parseio, low, high)
 
       if (fmt->flags & F_END)
 	{
-	  index = fmt->endsym >> 3;
-	  mask  = 1 << (fmt->endsym & 0x7);
+	  index = fmt->endsym / 8;
+	  mask  = 1 << (fmt->endsym % 8);
 
 	  if (parseio->parse_startsym[index] & mask)
 	    {
@@ -234,12 +226,12 @@ setup_bitmaps(parseio, low, high)
 
       if (fmt->flags & SYNC_CHAR)
 	{
-	  parseio->parse_syncsym[fmt->syncsym >> 3] |= (1 << (fmt->syncsym & 0x7));
+	  parseio->parse_syncsym[fmt->syncsym / 8] |= (1 << (fmt->syncsym % 8));
 	}
 
       parseio->parse_syncflags |= fmt->flags & (SYNC_START|SYNC_END|SYNC_CHAR|SYNC_ONE|SYNC_ZERO|SYNC_TIMEOUT|SYNC_SYNTHESIZE);
 
-      if (((fmt->flags & (SYNC_TIMEOUT|CVT_FIXEDONLY)) == (SYNC_TIMEOUT|CVT_FIXEDONLY)) &&
+      if ((fmt->flags & SYNC_TIMEOUT) &&
 	  ((parseio->parse_timeout.tv_sec || parseio->parse_timeout.tv_usec) ? timercmp(&parseio->parse_timeout, &fmt->timeout, >) : 1))
 	{
 	  parseio->parse_timeout = fmt->timeout;
@@ -247,13 +239,6 @@ setup_bitmaps(parseio, low, high)
       
       if (parseio->parse_dsize < fmt->length)
 	parseio->parse_dsize = fmt->length;
-    }
-
-  if (parseio->parse_pdata)
-    {
-      FREE(parseio->parse_pdata, parseio->parse_plen);
-      parseio->parse_plen = 0;
-      parseio->parse_pdata = (void *)0;
     }
 
   if (!f && ((int)(high - low) > 1))
@@ -269,27 +254,6 @@ setup_bitmaps(parseio, low, high)
       return 0;
     }
 
-  if ((high - low == 1) && (clockformats[low]->flags & CVT_FIXEDONLY) &&
-      (clockformats[low]->plen))
-    {
-      parseio->parse_plen  = clockformats[low]->plen;
-      parseio->parse_pdata = (void *)MALLOC(parseio->parse_plen);
-
-      if (!parseio->parse_pdata)
-	{
-	  /*
-	   * no memory
-	   */
-#ifdef PARSEKERNEL
-	  printf("parse: setup_bitmaps: failed: no memory for private data\n");
-#else
-	  syslog(LOG_ERR, "parse: setup_bitmaps: failed: no memory for private data\n");
-#endif
-	  return 0;
-	}
-      bzero((char *)parseio->parse_pdata, parseio->parse_plen);
-    }
-
   return 1;
 }
 
@@ -299,9 +263,6 @@ parse_ioinit(parseio)
   register parse_t *parseio;
 {
   parseprintf(DD_PARSE, ("parse_iostart\n"));
-  
-  parseio->parse_plen = 0;
-  parseio->parse_pdata = (void *)0;
   
   if (!setup_bitmaps(parseio, 0, nformats))
     return 0;
@@ -333,10 +294,6 @@ parse_ioend(parseio)
   register parse_t *parseio;
 {
   parseprintf(DD_PARSE, ("parse_ioend\n"));
-
-  if (parseio->parse_pdata)
-    FREE(parseio->parse_pdata, parseio->parse_plen);
-
   if (parseio->parse_data)
     FREE(parseio->parse_data, parseio->parse_dsize * 2 + 2);
 }
@@ -351,6 +308,24 @@ parse_ioread(parseio, ch, ctime)
   register unsigned updated = CVT_NONE;
   register unsigned short low, high;
   register unsigned index, mask;
+
+  parseprintf(DD_PARSE, ("parse_ioread(0x%x, char=0x%x, ..., ...)\n", (unsigned int)parseio, ch & 0xFF));
+
+  if (parseio->parse_flags & PARSE_FIXED_FMT)
+    {
+      if (!clockformats[parseio->parse_lformat]->convert)
+	{
+	  parseprintf(DD_PARSE, ("parse_ioread: input dropped.\n"));
+	  return CVT_NONE;
+	}
+      low = parseio->parse_lformat;
+      high = low + 1;
+    }
+  else
+    {
+      low = 0;
+      high = nformats;
+    }
 
   /*
    * within STREAMS CSx (x < 8) chars still have the upper bits set
@@ -374,146 +349,114 @@ parse_ioread(parseio, ch, ctime)
       break;
     }
 
-  parseprintf(DD_PARSE, ("parse_ioread(0x%x, char=0x%x, ..., ...)\n", (unsigned int)parseio, ch & 0xFF));
+  index = ch / 8;
+  mask  = 1 << (ch % 8);
 
-  if (parseio->parse_flags & PARSE_FIXED_FMT)
+  if ((parseio->parse_syncflags & SYNC_CHAR) &&
+      (parseio->parse_syncsym[index] & mask))
     {
-      if (!clockformats[parseio->parse_lformat]->convert)
+      register clockformat_t *fmt;
+      register unsigned short i;
+      /*
+       * got a sync event - call sync routine
+       */
+
+      for (i = low; i < high; i++)
 	{
-	  parseprintf(DD_PARSE, ("parse_ioread: input dropped.\n"));
-	  return CVT_NONE;
+	  fmt = clockformats[i];
+
+	  if ((fmt->flags & SYNC_CHAR) &&
+	      (fmt->syncsym == ch))
+	    {
+	      parseprintf(DD_PARSE, ("parse_ioread: SYNC_CHAR event\n"));
+	      if (fmt->syncevt)
+		fmt->syncevt(parseio, ctime, fmt->data, SYNC_CHAR);
+	    }
+	}
+    }
+		
+  if ((((parseio->parse_syncflags & SYNC_START) &&
+	(parseio->parse_startsym[index] & mask)) ||
+       (parseio->parse_index == 0)) ||
+      ((parseio->parse_syncflags & SYNC_TIMEOUT) &&
+       timedout(parseio, ctime)))
+    {
+      register unsigned short i;
+      /*
+       * packet start - re-fill buffer
+       */
+      if (parseio->parse_index)
+	{
+	  /*
+	   * filled buffer - thus not end character found
+	   * do processing now
+	   */
+	  parseio->parse_data[parseio->parse_index] = '\0';
+
+	  updated = timepacket(parseio);
+	  bcopy(parseio->parse_data, parseio->parse_ldata, parseio->parse_index+1);
+	  parseio->parse_ldsize = parseio->parse_index+1;
+	  if (parseio->parse_syncflags & SYNC_TIMEOUT)
+	    parseio->parse_dtime.parse_stime = *ctime;
 	}
 
-      if (clockformats[parseio->parse_lformat]->input)
-	{
-	  if (clockformats[parseio->parse_lformat]->input(parseio, ch, ctime))
-	    updated = timepacket(parseio); /* got a datagram - process */
-	  
-	  low = high = 0;	/* all done - just post processing */
-	}
-      else
-	{
-	  low = parseio->parse_lformat;
-	  high = low + 1;	/* scan just one format */
-	}
+      /*
+       * could be a sync event - call sync routine if needed
+       */
+      if (parseio->parse_syncflags & SYNC_START)
+	for (i = low; i < high; i++)
+	  {
+	    register clockformat_t *fmt = clockformats[i];
+
+	    if ((parseio->parse_index == 0) ||
+		((fmt->flags & SYNC_START) && (fmt->startsym == ch)))
+	      {
+		parseprintf(DD_PARSE, ("parse_ioread: SYNC_START event\n"));
+		if (fmt->syncevt)
+		  fmt->syncevt(parseio, ctime, fmt->data, SYNC_START);
+	      }
+	  }
+      parseio->parse_index = 1;
+      parseio->parse_data[0] = ch;
+      parseprintf(DD_PARSE, ("parse: parse_ioread: buffer start\n"));
     }
   else
     {
-      low = 0;
-      high = nformats;		/* scan all non fixed formats */
-    }
+      register unsigned short i;
 
-  if (low != high)
-    {
-      index = ch >> 3;
-      mask  =  1 << (ch & 0x7);
-
-      if ((parseio->parse_syncflags & SYNC_CHAR) &&
-	  (parseio->parse_syncsym[index] & mask))
+      if (parseio->parse_index < parseio->parse_dsize)
 	{
-	  register clockformat_t *fmt;
-	  register unsigned short i;
 	  /*
-	   * got a sync event - call sync routine
+	   * collect into buffer
 	   */
-
-	  for (i = low; i < high; i++)
-	    {
-	      fmt = clockformats[i];
-
-	      if ((fmt->flags & SYNC_CHAR) &&
-		  (fmt->syncsym == ch))
-		{
-		  parseprintf(DD_PARSE, ("parse_ioread: SYNC_CHAR event\n"));
-		  if (fmt->syncevt)
-		    fmt->syncevt(parseio, ctime, fmt->data, SYNC_CHAR);
-		}
-	    }
+          parseprintf(DD_PARSE, ("parse: parse_ioread: buffer[%d] = 0x%x\n", parseio->parse_index, ch));
+	  parseio->parse_data[parseio->parse_index++] = ch;
 	}
-		
-      if ((((parseio->parse_syncflags & SYNC_START) &&
-	    (parseio->parse_startsym[index] & mask)) ||
-	   (parseio->parse_index == 0)) ||
-	  ((parseio->parse_syncflags & SYNC_TIMEOUT) &&
-	   timedout(parseio, ctime)))
+
+      if ((parseio->parse_endsym[index] & mask) ||
+	  (parseio->parse_index >= parseio->parse_dsize))
 	{
-	  register unsigned short i;
 	  /*
-	   * packet start - re-fill buffer
+	   * packet end - process buffer
 	   */
-	  if (parseio->parse_index)
-	    {
-	      /*
-	       * filled buffer - thus not end character found
-	       * do processing now
-	       */
-	      parseio->parse_data[parseio->parse_index] = '\0';
-
-	      updated = timepacket(parseio);
-	      bcopy(parseio->parse_data, parseio->parse_ldata, parseio->parse_index+1);
-	      parseio->parse_ldsize = parseio->parse_index+1;
-	      if (parseio->parse_syncflags & SYNC_TIMEOUT)
-		parseio->parse_dtime.parse_stime = *ctime;
-	    }
-
-	  /*
-	   * could be a sync event - call sync routine if needed
-	   */
-	  if (parseio->parse_syncflags & SYNC_START)
+	  if (parseio->parse_syncflags & SYNC_END)
 	    for (i = low; i < high; i++)
 	      {
 		register clockformat_t *fmt = clockformats[i];
 
-		if ((parseio->parse_index == 0) ||
-		    ((fmt->flags & SYNC_START) && (fmt->startsym == ch)))
+		if ((fmt->flags & SYNC_END) && (fmt->endsym == ch))
 		  {
-		    parseprintf(DD_PARSE, ("parse_ioread: SYNC_START event\n"));
+		    parseprintf(DD_PARSE, ("parse_ioread: SYNC_END event\n"));
 		    if (fmt->syncevt)
-		      fmt->syncevt(parseio, ctime, fmt->data, SYNC_START);
+		      fmt->syncevt(parseio, ctime, fmt->data, SYNC_END);
 		  }
 	      }
-	  parseio->parse_index = 1;
-	  parseio->parse_data[0] = ch;
-	  parseprintf(DD_PARSE, ("parse: parse_ioread: buffer start\n"));
-	}
-      else
-	{
-	  register unsigned short i;
-
-	  if (parseio->parse_index < parseio->parse_dsize)
-	    {
-	      /*
-	       * collect into buffer
-	       */
-	      parseprintf(DD_PARSE, ("parse: parse_ioread: buffer[%d] = 0x%x\n", parseio->parse_index, ch));
-	      parseio->parse_data[parseio->parse_index++] = ch;
-	    }
-
-	  if ((parseio->parse_endsym[index] & mask) ||
-	      (parseio->parse_index >= parseio->parse_dsize))
-	    {
-	      /*
-	       * packet end - process buffer
-	       */
-	      if (parseio->parse_syncflags & SYNC_END)
-		for (i = low; i < high; i++)
-		  {
-		    register clockformat_t *fmt = clockformats[i];
-
-		    if ((fmt->flags & SYNC_END) && (fmt->endsym == ch))
-		      {
-			parseprintf(DD_PARSE, ("parse_ioread: SYNC_END event\n"));
-			if (fmt->syncevt)
-			  fmt->syncevt(parseio, ctime, fmt->data, SYNC_END);
-		      }
-		  }
-	      parseio->parse_data[parseio->parse_index] = '\0';
-	      updated = timepacket(parseio);
-	      bcopy(parseio->parse_data, parseio->parse_ldata, parseio->parse_index+1);
-	      parseio->parse_ldsize = parseio->parse_index+1;
-	      parseio->parse_index = 0;
-	      parseprintf(DD_PARSE, ("parse: parse_ioread: buffer end\n"));
-	    }
+	  parseio->parse_data[parseio->parse_index] = '\0';
+	  updated = timepacket(parseio);
+	  bcopy(parseio->parse_data, parseio->parse_ldata, parseio->parse_index+1);
+	  parseio->parse_ldsize = parseio->parse_index+1;
+	  parseio->parse_index = 0;
+          parseprintf(DD_PARSE, ("parse: parse_ioread: buffer end\n"));
 	}
     }
 
@@ -533,9 +476,7 @@ parse_ioread(parseio, ch, ctime)
 
 #ifdef DEBUG
   if ((updated & CVT_MASK) != CVT_NONE)
-    {
-      parseprintf(DD_PARSE, ("parse_ioread: time sample accumulated (status=0x%x)\n", updated));
-    }
+    parseprintf(DD_PARSE, ("parse_ioread: time sample accumulated (status=0x%x)\n", updated));
 #endif
 
   parseio->parse_dtime.parse_status = updated;
@@ -596,7 +537,6 @@ parse_iodone(parseio)
   /*
    * we need to clean up certain flags for the next round
    */
-  parseprintf(DD_PARSE, ("parse_iodone: DONE\n"));
   parseio->parse_dtime.parse_state = 0; /* no problems with ISRs */
 }
 
@@ -610,7 +550,7 @@ parse_iodone(parseio)
 time_t
 parse_to_unixtime(clock, cvtrtc)
   register clocktime_t   *clock;
-  register u_long *cvtrtc;
+  register unsigned LONG *cvtrtc;
 {
 #define SETRTC(_X_)	{ if (cvtrtc) *cvtrtc = (_X_); }
   static int days_of_month[] = 
@@ -706,7 +646,7 @@ parse_to_unixtime(clock, cvtrtc)
 int
 Stoi(s, zp, cnt)
   char *s;
-  long *zp;
+  LONG *zp;
   int cnt;
 {
   char *b = s;
@@ -770,24 +710,24 @@ Strok(s, m)
   return !*m;
 }
 
-u_long
+unsigned LONG
 updatetimeinfo(parseio, t, usec, flags)
   register parse_t         *parseio;
   register time_t         t;
-  register u_long  usec;
-  register u_long  flags;
+  register unsigned LONG  usec;
+  register unsigned LONG  flags;
 {
-  register long usecoff;
-  register long mean;
-  long delta[PARSE_DELTA];
+  register LONG usecoff;
+  register LONG mean;
+  LONG delta[PARSE_DELTA];
 
 #ifdef PARSEKERNEL
     usecoff = (t - parseio->parse_dtime.parse_stime.tv.tv_sec) * 1000000
       - parseio->parse_dtime.parse_stime.tv.tv_usec + usec;
 #else
-    extern long tstouslo[];
-    extern long tstousmid[];
-    extern long tstoushi[];
+    extern LONG tstouslo[];
+    extern LONG tstousmid[];
+    extern LONG tstoushi[];
 
     TSFTOTVU(parseio->parse_dtime.parse_stime.fp.l_uf, usecoff);
     usecoff  = -usecoff;
@@ -816,7 +756,7 @@ updatetimeinfo(parseio, t, usec, flags)
 	  {			/* Yes - it's slow sort */
 	    if (delta[s] > delta[k]) 
 	      {
-		register long tmp;
+		register LONG tmp;
 		
 		tmp      = delta[k];
 		delta[k] = delta[s];
@@ -832,9 +772,9 @@ updatetimeinfo(parseio, t, usec, flags)
        */
       while ((n - i) > 8)
 	{
-	  register long top = delta[n-1];
-	  register long mid = delta[(n+i)>>1];
-	  register long low = delta[i];
+	  register LONG top = delta[n-1];
+	  register LONG mid = delta[(n+i)>>1];
+	  register LONG low = delta[i];
 	  
 	  if ((top - mid) > (mid - low))
 	    {
@@ -883,8 +823,7 @@ updatetimeinfo(parseio, t, usec, flags)
     }
   
   parseprintf(DD_PARSE,("parse: updatetimeinfo: T=%x+%d usec, useccoff=%d, usecerror=%d, usecdisp=%d\n",
-			(int)t, (int)usec, (int)usecoff, (int)parseio->parse_dtime.parse_usecerror,
-			(int)parseio->parse_dtime.parse_usecdisp));
+		      t, usec, usecoff, parseio->parse_dtime.parse_usecerror, parseio->parse_dtime.parse_usecdisp));
   
 
 #ifdef PARSEKERNEL
@@ -916,7 +855,7 @@ syn_simple(parseio, ts, format, why)
   register parse_t *parseio;
   register timestamp_t *ts;
   register struct format *format;
-  register u_long why;
+  register unsigned LONG why;
 {
   parseio->parse_dtime.parse_stime = *ts;
 }
@@ -927,7 +866,7 @@ syn_simple(parseio, ts, format, why)
  * handle a pps time stamp
  */
 /*ARGSUSED*/
-u_long
+unsigned LONG
 pps_simple(parseio, status, ptime)
   register parse_t *parseio;
   register int status;
@@ -944,25 +883,26 @@ pps_simple(parseio, status, ptime)
  *
  * process a data packet
  */
-static u_long
+static unsigned LONG
 timepacket(parseio)
   register parse_t *parseio;
 {
   register int k;
   register unsigned short format;
   register time_t t;
-  register u_long cvtsum = 0;/* accumulated CVT_FAIL errors */
-  u_long cvtrtc;		/* current conversion result */
+  register unsigned LONG cvtsum = 0;/* accumulated CVT_FAIL errors */
+  unsigned LONG cvtrtc;		/* current conversion result */
   clocktime_t clock;
   
-  bzero(&clock, sizeof clock);
   format = parseio->parse_lformat;
 
   k = 0;
 
   if (parseio->parse_flags & PARSE_FIXED_FMT)
     {
-      switch ((cvtrtc = clockformats[format]->convert ? clockformats[format]->convert(parseio->parse_data, parseio->parse_index, clockformats[format]->data, &clock, parseio->parse_pdata) : CVT_NONE) & CVT_MASK)
+      clock.utctime = 0;
+
+      switch ((cvtrtc = clockformats[format]->convert ? clockformats[format]->convert(parseio->parse_data, parseio->parse_index, clockformats[format]->data, &clock) : CVT_NONE) & CVT_MASK)
 	{
 	case CVT_FAIL:
 	  parseio->parse_badformat++;
@@ -984,14 +924,11 @@ timepacket(parseio)
 	   */
 	  parseio->parse_badformat++;
 	  cvtsum = CVT_BADFMT;
+
 	  break;
 	  
 	case CVT_OK:
 	  k = 1;
-	  break;
-
-	case CVT_SKIP:
-	  k = 2;
 	  break;
 
 	default:
@@ -1016,8 +953,10 @@ timepacket(parseio)
 	{
 	  do
 	    {
+              clock.utctime = 0;
+
 	      switch ((cvtrtc = (clockformats[format]->convert && !(clockformats[format]->flags & CVT_FIXEDONLY)) ?
-		       clockformats[format]->convert(parseio->parse_data, parseio->parse_index, clockformats[format]->data, &clock, parseio->parse_pdata) :
+		       clockformats[format]->convert(parseio->parse_data, parseio->parse_index, clockformats[format]->data, &clock) :
 		       CVT_NONE) & CVT_MASK)
 		{
 		case CVT_FAIL:
@@ -1067,8 +1006,6 @@ timepacket(parseio)
       return CVT_FAIL|cvtsum;
     }
   
-  if (k == 2) return CVT_OK;
-
   if ((t = parse_to_unixtime(&clock, &cvtrtc)) == -1)
     {
 #ifdef PARSEKERNEL
@@ -1225,18 +1162,6 @@ parse_setcs(dct, parse)
  * History:
  *
  * parse.c,v
- * Revision 3.27  1994/06/01  08:18:33  kardel
- * more debug info
- *
- * Revision 3.26  1994/05/30  10:20:07  kardel
- * LONG cleanup
- *
- * Revision 3.25  1994/05/12  12:49:12  kardel
- * printf fmt/arg cleanup
- *
- * Revision 3.24  1994/03/27  15:01:36  kardel
- * reorder include file to cope with PTX
- *
  * Revision 3.23  1994/03/25  13:09:02  kardel
  * considering FIXEDONLY entries only in FIXEDONLY mode
  *

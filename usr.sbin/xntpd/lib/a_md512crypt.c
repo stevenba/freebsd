@@ -1,4 +1,4 @@
-/*
+/* authmd512crypt.c,v 3.1 1993/07/06 01:07:52 jbj Exp
  *  md5crypt - MD5 based authentication routines
  */
 
@@ -7,7 +7,7 @@
 #include "md5.h"
 #include "ntp_stdlib.h"
 
-extern u_long cache_keyid;
+extern U_LONG cache_keyid;
 extern char *cache_key;
 extern int cache_keylen;
 
@@ -17,6 +17,7 @@ extern int cache_keylen;
 extern U_LONG authencryptions;
 extern U_LONG authdecryptions;
 extern U_LONG authkeyuncached;
+extern U_LONG authdecryptok;
 extern U_LONG authnokey;
 
 /*
@@ -40,7 +41,7 @@ static MD5_CTX ctx;
 
 void
 MD5auth1crypt(keyno, pkt, length)
-    u_long keyno;
+    U_LONG keyno;
     U_LONG *pkt;
     int length;	/* length of all encrypted data */
 {
@@ -66,7 +67,7 @@ MD5auth1crypt(keyno, pkt, length)
  */
 int
 MD5auth2crypt(keyno, pkt, length)
-    u_long keyno;
+    U_LONG keyno;
     U_LONG *pkt;
     int length;	/* total length of encrypted area */
 {

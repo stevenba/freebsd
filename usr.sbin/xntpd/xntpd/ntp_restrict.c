@@ -54,10 +54,10 @@ static	int restrictcount;	/* count of entries in the restriction list */
 static	struct restrictlist *resfree;
 static	int numresfree;		/* number of structures on free list */
 
-u_long res_calls;
-u_long res_found;
-u_long res_not_found;
-u_long res_timereset;
+U_LONG res_calls;
+U_LONG res_found;
+U_LONG res_not_found;
+U_LONG res_timereset;
 
 /*
  * Parameters of the RES_LIMITED restriction option.
@@ -65,14 +65,14 @@ u_long res_timereset;
  * client_limit_period is the number of seconds after which an entry
  * is no longer considered for client limit determination
  */
-u_long client_limit;
-u_long client_limit_period;
+U_LONG client_limit;
+U_LONG client_limit_period;
 /*
  * count number of restriction entries referring to RES_LIMITED
  * controls activation/deactivation of monitoring
  * (with respect ro RES_LIMITED control)
  */
-u_long res_limited_refcnt;
+U_LONG res_limited_refcnt;
 
 /*
  * Our initial allocation of list entries.
@@ -82,7 +82,7 @@ static	struct restrictlist resinit[INITRESLIST];
 /*
  * Imported from the timer module
  */
-extern u_long current_time;
+extern U_LONG current_time;
 
 /*
  * debug flag
@@ -116,7 +116,7 @@ init_restrict()
 	 * list as our default entry.  Everything in here
 	 * should be zero for now.
 	 */
-	resinit[0].addr = htonl(INADDR_ANY);
+	resinit[0].addr = INADDR_ANY;
 	resinit[0].mask = 0;
 	restrictlist = &resinit[0];
 	restrictcount = 1;
@@ -137,9 +137,9 @@ init_restrict()
 	client_limit_period = 3600;
 	res_limited_refcnt = 0;
 
-	sprintf(bp, "client_limit=%ld", client_limit);
+	sprintf(bp, "client_limit=%d", client_limit);
 	set_sys_var(bp, strlen(bp)+1, RO);
-	sprintf(bp, "client_limit_period=%ld", client_limit_period);
+	sprintf(bp, "client_limit_period=%d", client_limit_period);
 	set_sys_var(bp, strlen(bp)+1, RO);
 }
 
@@ -153,7 +153,7 @@ restrictions(srcadr)
 {
 	register struct restrictlist *rl;
 	register struct restrictlist *match;
-	register u_long hostaddr;
+	register U_LONG hostaddr;
 	register int isntpport;
 
 	res_calls++;
@@ -210,7 +210,7 @@ restrictions(srcadr)
 
 #ifdef DEBUG
 		if (debug > 2)
-			printf("limited clients check: %ld clients, period %ld seconds, net is 0x%lX\n",
+			printf("limited clients check: %d clients, period %d seconds, net is 0x%X\n",
 			       client_limit, client_limit_period,
 			       netof(hostaddr));
 #endif /*DEBUG*/
@@ -238,7 +238,7 @@ restrictions(srcadr)
 			    > client_limit_period) {
 #ifdef DEBUG
 				if (debug > 5)
-					printf("checking: %s: ignore: too old: %ld\n",
+					printf("checking: %s: ignore: too old: %d\n",
 					       numtoa(md->rmtadr),
 					       current_time - md->lasttime);
 #endif
@@ -259,7 +259,7 @@ restrictions(srcadr)
 			    netof(hostaddr)) {
 #ifdef DEBUG
 				if (debug > 5)
-					printf("checking: %s: different net 0x%lX\n",
+					printf("checking: %s: different net 0x%X\n",
 					       numtoa(md->rmtadr),
 					       netof(md->rmtadr));
 #endif
@@ -286,7 +286,7 @@ restrictions(srcadr)
 		}
 #ifdef DEBUG
 		if (debug > 4)
-			printf("this one is rank %d in list, limit is %lu: %s\n",
+			printf("this one is rank %d in list, limit is %d: %s\n",
 			       lcnt, client_limit,
 			       (lcnt <= client_limit) ? "ALLOW" : "REJECT");
 #endif
@@ -312,8 +312,8 @@ restrict(op, resaddr, resmask, mflags, flags)
 	int mflags;
 	int flags;
 {
-	register u_long addr;
-	register u_long mask;
+	register U_LONG addr;
+	register U_LONG mask;
 	register struct restrictlist *rl;
 	register struct restrictlist *rlprev;
 	int i;
@@ -329,7 +329,7 @@ restrict(op, resaddr, resmask, mflags, flags)
 	 * If this is the default address, point at first on list.  Else
 	 * go searching for it.
 	 */
-	if (addr == htonl(INADDR_ANY)) {
+	if (addr == INADDR_ANY) {
 		rlprev = 0;
 		rl = restrictlist;
 	} else {
@@ -433,7 +433,7 @@ restrict(op, resaddr, resmask, mflags, flags)
 		 * interface entry.
 		 */
 		if (rl != 0
-		    && rl->addr != htonl(INADDR_ANY)
+		    && rl->addr != INADDR_ANY
 		    && !(rl->mflags & RESM_INTERFACE)) {
 			rlprev->next = rl->next;
 			restrictcount--;

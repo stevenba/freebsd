@@ -438,7 +438,7 @@ sync
 verified_install=""
 while [ ! "$verified_install" ]; do	# Begin of Big Loop
 
-rotdelay="-d 0 -n 1"
+rotdelay=""
 drivename=wd0
 drivetype=wd
 sect_fwd=""
@@ -465,11 +465,13 @@ e*|E*|st*|ST*)
 	;;
 i*|I*)
 	type=ST506
+	rotdelay="-d 0"
 	;;
 sc*|SC*)
 	drivename=sd0
 	drivetype=sd
 	type=SCSI
+	rotdelay="-d 0"
 	DEFSECT=32
 	DEFHEAD=64
 	;;
@@ -861,8 +863,7 @@ put_fdisk_data
 echo
 echo -n "Labelling disk..."
 echo y | 
-/sbin/disklabel -w -r -B ${drivename}c $name
-# >/dev/null 2>&1
+/sbin/disklabel -w -r ${drivename} $name /usr/mdec/${drivetype}boot /usr/mdec/boot${drivetype} >/dev/null 2>&1
 echo	" done."
 
 # XXX - Do it again, incase we disklabeled sector 0!
@@ -881,7 +882,7 @@ if [ "$sect_fwd" = "sf:" ]; then
 		bad_read=$(expr "$data" : '[^(]*(read)[^0-9]*\([0-9]*\)')
 		[ "$bad_seek" -o "$bad_read" ] && echo -n "$bad_seek $bad_read "
 	done)
-	[ "$badlist" ] && bad144 -a -c $drivename $badlist
+	[ "$badlist" ] && bad144 -a -c $drivename "$badlist"
 	echo " done."
 fi
 
@@ -1012,12 +1013,6 @@ echo "exit 1"
 ) >etc/rc
 echo "done."
 
-if [ "$hname" != "" ]; then /sbin/umount /dev/${drivename}h ; fi
-if [ "$gname" != "" ]; then /sbin/umount /dev/${drivename}g ; fi
-if [ "$fname" != "" ]; then /sbin/umount /dev/${drivename}f ; fi
-if [ "$ename" != "" ]; then /sbin/umount /dev/${drivename}e ; fi
-/sbin/umount /mnt
-
 sync
 
 echo
@@ -1034,9 +1029,7 @@ echo	"If all goes well, you can enter the command \`copy' at the prompt to"
 echo	"copy the kernel to the hard disk.  When asked for which partition to"
 echo	"copy to, enter \`${drivename}a' (without the quotes)."
 echo
-echo	"The light on the floppy may not go out, so don't wait for it."
-echo
-echo	"Okay, that's all for now.  I'm halting ..."
+echo	"Okay, that's all for now.  I'm waiting for you to enter \`halt'..."
 
 sync;sync;sync;sync
-halt
+

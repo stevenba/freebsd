@@ -323,7 +323,7 @@ recurse:
 
   recsum = from_oct (8, header->header.chksum);
 
-  signed_sum = sum = 0;
+  sum = 0;
   p = header->charptr;
   for (i = sizeof (*header); --i >= 0;)
     {

@@ -1,4 +1,4 @@
-/*
+/* msyslog.c,v 3.1 1993/07/06 01:08:36 jbj Exp
  * msyslog - either send a message to the terminal or print it on
  *	     the standard output.
  *
@@ -43,14 +43,11 @@ void msyslog(va_alist)
 	char *fmt;
 #endif
 	va_list ap;
-	char buf[1025], nfmt[256], xerr[50];
-	const char *err;
+	char buf[1025], nfmt[256], xerr[50], *err;
 	register int c, l;
 	register char *n, *f, *prog;
-#ifndef SYS_44BSD
 	extern int sys_nerr;
 	extern char *sys_errlist[];
-#endif
 	int olderrno;
 
 #ifdef __STDC__
@@ -76,7 +73,7 @@ void msyslog(va_alist)
 			continue;
 		}
 		if ((unsigned)olderrno > sys_nerr)
-			sprintf((char *)(err = xerr), "error %d", olderrno);
+			sprintf((err = xerr), "error %d", olderrno);
 		else
 			err = sys_errlist[olderrno];
 		if (n + (l = strlen(err)) < &nfmt[254]) {

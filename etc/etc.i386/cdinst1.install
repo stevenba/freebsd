@@ -1,7 +1,7 @@
 #!/bin/sh
 #	cd install floppy disk /install script
 #
-#	$Id: cdinst1.install,v 1.6 1994/06/29 06:46:01 rgrimes Exp $
+#	$Id: cdinst1.install,v 1.3 1994/05/03 10:11:47 rgrimes Exp $
 
 # ${OPSYSTEM}, the mounting of the cdrom drive, and the path are all
 # setup by .profile
@@ -432,7 +432,7 @@ sync
 verified_install=""
 while [ ! "$verified_install" ]; do	# Begin of Big Loop
 
-rotdelay="-d 0 -n 1"
+rotdelay=""
 drivename=wd0
 drivetype=wd
 sect_fwd=""
@@ -459,11 +459,13 @@ e*|E*|st*|ST*)
 	;;
 i*|I*)
 	type=ST506
+	rotdelay="-d 0"
 	;;
 sc*|SC*)
 	drivename=sd0
 	drivetype=sd
 	type=SCSI
+	rotdelay="-d 0"
 	DEFSECT=32
 	DEFHEAD=64
 	;;
@@ -862,7 +864,7 @@ if [ "$sect_fwd" = "sf:" ]; then
 		bad_read=$(expr "$data" : '[^(]*(read)[^0-9]*\([0-9]*\)')
 		[ "$bad_seek" -o "$bad_read" ] && echo -n "$bad_seek $bad_read "
 	done)
-	[ "$badlist" ] && bad144 -a -c $drivename $badlist
+	[ "$badlist" ] && bad144 -a -c $drivename "$badlist"
 	echo " done."
 fi
 
@@ -928,7 +930,7 @@ if [ "$hname" != "" ]; then
 fi
 
 cat /etc/disktab >etc/disktab.install
-cp -p /kernel /mnt
+cp -p /386bsd /mnt/386bsd
 
 echo
 echo "Building /dev files..."

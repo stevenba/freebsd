@@ -40,8 +40,8 @@ m2-exp.tab.c: $(.CURDIR)/m2-exp.y
 
 
 
-CFLAGS+= -I$(.CURDIR)/. -I${DESTDIR}/usr/include/readline -I$(.CURDIR)/../bfd
-DPADD+= ${LIBREADLINE} ${LIBTERMCAP}
+CFLAGS+= -I$(.CURDIR)/. -I/usr/include/readline -I$(.CURDIR)/../bfd
+DPADD+= $(LIBREADLINE) $(LIBTERM)
 LDADD+= -lreadline  -ltermcap
 
 .if exists(${.CURDIR}/../libiberty/obj)
@@ -68,7 +68,5 @@ LDADD+=   -L${.CURDIR}/../mmalloc/ -lmmalloc
 DPADD+=   ${.CURDIR}/../mmalloc/libmmalloc.a
 .endif
 
-LDADD+=   -lcompat
-DPADD+=   ${LIBCOMPAT}
 
 .include <bsd.prog.mk>

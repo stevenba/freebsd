@@ -10,14 +10,14 @@ NOPROFILE=	YES
 
 CFLAGS+= -I${.CURDIR} -DSTDC_HEADERS -DPOSIX -DHAS_TROFF -DDO_COMPRESS -DALT_SYSTEMS
 CLEANFILES+=	${CONFH}
-SRCS =	util.c gripes.c ${CONFH}
+SRCS =	util.c gripes.c
 
-libman.a:: ${CONFH}
+libman.a::	${CONFH}
 
 install:
 	@echo -n
 
-${CONFH}: ${.CURDIR}/config.h_dist ${.CURDIR}/../Makefile.inc
+depend ${CONFH}:	${.CURDIR}/config.h_dist ../Makefile.inc
 	sed -e 's,%apropos%,${apropos},' -e 's,%whatis%,${whatis},' \
 	    -e 's,%pager%,${pager},' -e 's,%troff%,${troff},' \
 	    -e 's,%nroff%,${nroff},' -e 's,%tbl%,${tbl},' \

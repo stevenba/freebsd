@@ -41,21 +41,14 @@ char copyright[] =
  *
  */
 #include <stdio.h>
-#include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <syslog.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <sys/param.h>
-#include <machine/cpu.h>
-#include <sys/sysctl.h>
 
 #include "pathnames.h"
 
-#define REPORT_PERIOD (30*60)
-
-void fake() {}
+char storage[] = _PATH_OFFSET;
 
 int main(argc, argv)
 	int argc;
@@ -64,17 +57,13 @@ int main(argc, argv)
 	struct tm local, utc;
 	struct timeval tv, *stv;
 	struct timezone tz, *stz;
-	int kern_offset;
-	size_t len;
-	int mib[2];
 	/* Avoid time_t here, can be unsigned long or worse */
-	long offset, utcsec, localsec, diff;
+	long offset, oldoffset, utcsec, localsec, diff;
 	time_t initial_sec, final_sec;
-	int ch, init = -1;
-	int disrtcset, need_restore = 0;
-	sigset_t mask, emask;
+	int ch, init = -1, verbose = 0;
+	FILE *f;
 
-	while ((ch = getopt(argc, argv, "ai")) != EOF)
+	while ((ch = getopt(argc, argv, "aiv")) != EOF)
 		switch((char)ch) {
 		case 'i':               /* initial call, save offset */
 			if (init != -1)
@@ -86,42 +75,44 @@ int main(argc, argv)
 				goto usage;
 			init = 0;
 			break;
+		case 'v':               /* verbose */
+			verbose = 1;
+			break;
 		default:
 		usage:
 			fprintf(stderr, "Usage:\n\
-\tadjkerntz -i\t(initial call from /etc/rc)\n\
-\tadjkerntz -a\t(adjustment call from crontab)\n");
-  			return 2;
+\tadjkerntz -i [-v]\t(initial call from /etc/rc)\n\
+\tadjkerntz -a [-v]\t(adjustment call from crontab)\n");
+			return 2;
 		}
 	if (init == -1)
 		goto usage;
-  
+
 	if (access(_PATH_CLOCK, F_OK))
 		return 0;
 
-	sigemptyset(&mask);
-	sigemptyset(&emask);
-	sigaddset(&mask, SIGTERM);
+	/* Restore saved offset */
 
-	openlog("adjkerntz", LOG_PID|LOG_PERROR, LOG_DAEMON);
-
-	(void) signal(SIGHUP, SIG_IGN);
-
-	if (init && daemon(0, 1)) {
-		syslog(LOG_ERR, "daemon: %m");
-		return 1;
+	if (!init) {
+		if ((f = fopen(storage, "r")) == NULL) {
+			perror(storage);
+			return 1;
+		}
+		if (fscanf(f, "%ld", &oldoffset) != 1) {
+			fprintf(stderr, "Misformatted offset in %s\n",
+				storage);
+			return 1;
+		}
+		(void) fclose(f);
 	}
-
-again:
-
-	(void) sigprocmask(SIG_BLOCK, &mask, NULL);
-	(void) signal(SIGTERM, fake);
+	else
+		oldoffset = 0;
 
 /****** Critical section, do all things as fast as possible ******/
 
 	/* get local CMOS clock and possible kernel offset */
 	if (gettimeofday(&tv, &tz)) {
-		syslog(LOG_ERR, "gettimeofday: %m");
+		perror("gettimeofday");
 		return 1;
 	}
 
@@ -139,30 +130,19 @@ again:
 	if (utcsec == -1 || localsec == -1) {
 		/*
 		 * XXX user can only control local time, and it is
-		 * unacceptable to fail here for init.  2:30 am in the
+		 * unacceptable to fail here for -i.  2:30 am in the
 		 * middle of the nonexistent hour means 3:30 am.
 		 */
-		syslog(LOG_WARNING,
-		"Nonexistent local time -- will retry after %d secs", REPORT_PERIOD);
-		(void) signal(SIGTERM, SIG_DFL);
-		(void) sigprocmask(SIG_UNBLOCK, &mask, NULL);
-		(void) sleep(REPORT_PERIOD);
-		goto again;
-	}
-	offset = utcsec - localsec;
-
-	mib[0] = CTL_MACHDEP;
-	mib[1] = CPU_ADJKERNTZ;
-	len = sizeof(kern_offset);
-	if (sysctl(mib, 2, &kern_offset, &len, NULL, 0) == -1) {
-		syslog(LOG_ERR, "sysctl(get_offset): %m");
+		fprintf(stderr,
+			"Nonexistent local time - try again in an hour\n");
 		return 1;
 	}
+	offset = utcsec - localsec;
 
 	/* correct the kerneltime for this diffs */
 	/* subtract kernel offset, if present, old offset too */
 
-	diff = offset - tz.tz_minuteswest * 60 - kern_offset;
+	diff = offset - tz.tz_minuteswest * 60 - oldoffset;
 
 	if (diff != 0) {
 
@@ -183,19 +163,16 @@ again:
 			 * XXX as above.  The user has even less control,
 			 * but perhaps we never get here.
 			 */
-			syslog(LOG_WARNING,
-		"Nonexistent (final) local time -- will retry after %d secs", REPORT_PERIOD);
-			(void) signal(SIGTERM, SIG_DFL);
-			(void) sigprocmask(SIG_UNBLOCK, &mask, NULL);
-			(void) sleep(REPORT_PERIOD);
-			goto again;
+			fprintf(stderr,
+		"Nonexistent (final) local time - try again in an hour\n");
+			return 1;
 		}
 		offset = utcsec - localsec;
 
 		/* correct the kerneltime for this diffs */
 		/* subtract kernel offset, if present, old offset too */
 
-		diff = offset - tz.tz_minuteswest * 60 - kern_offset;
+		diff = offset - tz.tz_minuteswest * 60 - oldoffset;
 
 		if (diff != 0) {
 			tv.tv_sec += diff;
@@ -216,59 +193,32 @@ again:
 		stz = NULL;
 
 	if (stz != NULL || stv != NULL) {
-		if (init && stv != NULL) {
-			mib[0] = CTL_MACHDEP;
-			mib[1] = CPU_DISRTCSET;
-			len = sizeof(disrtcset);
-			if (sysctl(mib, 2, &disrtcset, &len, NULL, 0) == -1) {
-				syslog(LOG_ERR, "sysctl(get_disrtcset): %m");
-				return 1;
-			}
-			if (disrtcset == 0) {
-				disrtcset = 1;
-				need_restore = 1;
-				if (sysctl(mib, 2, NULL, NULL, &disrtcset, len) == -1) {
-					syslog(LOG_ERR, "sysctl(set_disrtcset): %m");
-					return 1;
-				}
-			}
-		}
-		/* stz means that kernel zone shifted */
-		/* clock needs adjustment even if !init */
-		if ((init || stz != NULL) && settimeofday(stv, stz)) {
-			syslog(LOG_ERR, "settimeofday: %m");
-			return 1;
-		}
-	}
-
-	if (kern_offset != offset) {
-		kern_offset = offset;
-		mib[0] = CTL_MACHDEP;
-		mib[1] = CPU_ADJKERNTZ;
-		len = sizeof(kern_offset);
-		if (sysctl(mib, 2, NULL, NULL, &kern_offset, len) == -1) {
-			syslog(LOG_ERR, "sysctl(update_offset): %m");
-			return 1;
-		}
-	}
-
-	if (need_restore) {
-		need_restore = 0;
-		disrtcset = 0;
-		if (sysctl(mib, 2, NULL, NULL, &disrtcset, len) == -1) {
-			syslog(LOG_ERR, "sysctl(restore_disrtcset): %m");
+		if (settimeofday(stv, stz)) {
+			perror("settimeofday");
 			return 1;
 		}
 	}
 
 /****** End of critical section ******/
 
-	if (init) {
-		init = 0;
-		/* wait for signals and acts like -a */
-		(void) sigsuspend(&emask);
-		goto again;
+	if (verbose)
+		printf("Calculated zone offset difference: %ld seconds\n",
+		       diff);
+
+	if (offset != oldoffset) {
+		(void) umask(022);
+		/* Save offset for next calls from crontab */
+		if ((f = fopen(storage, "w")) == NULL) {
+			perror(storage);
+			return 1;
+		}
+		fprintf(f, "%ld\n", offset);
+		if (fclose(f)) {
+			perror(storage);
+			return 1;
+		}
 	}
 
 	return 0;
 }
+

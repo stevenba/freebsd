@@ -1,203 +1,256 @@
-#	$Id: BSD.usr.dist,v 1.25 1994/10/24 10:00:00 sos Exp $
+#	$Id: BSD.usr.dist,v 1.14 1994/05/31 15:59:14 ache Exp $
 #
 
-/set type=dir uname=bin gname=bin mode=0755
-.               uname=root gname=wheel
-    bin            
-    ..
-/set type=dir uname=games gname=bin mode=0700
-    games           uname=bin mode=0755
-        hide           
-        ..
-    ..
-/set type=dir uname=bin gname=bin mode=0755
-    include        
-        arpa           
-        ..
-        g++            
-        ..
-        kerberosIV     
-        ..
-        objc           
-        ..
-        protocols      
-        ..
-        rpc            
-        ..
-    ..
-    lib            
-    ..
-    libexec        
-        lpr            
-        ..
-        uucp           
-        ..
-    ..
-    local          
-    ..
-    mdec           
-    ..
-    obj            
-    ..
-    sbin           
-    ..
-    share          
-        calendar       
-        ..
-        dict           
-        ..
-        examples       
-            FreeBSD_version
-            ..
-            etc            
-            ..
-            ibcs2
-	    ..
-	    lkm            
-            ..
-            sunrpc         
-            ..
-        ..
-/set type=dir uname=games gname=bin mode=0755
-        games           uname=bin
-            atc            
-            ..
-            boggle         
-            ..
-            fortune        
-            ..
-            larn           
-            ..
-        ..
-/set type=dir uname=bin gname=bin mode=0755
-        groff_font     
-            devX100        
-            ..
-            devX100-12     
-            ..
-            devX75         
-            ..
-            devX75-12      
-            ..
-            devascii       
-            ..
-            devdvi         
-                generate       
-                ..
-            ..
-            devlatin1      
-            ..
-            devps          
-                generate       
-                ..
-            ..
-        ..
-	info
+/set type=file uname=bin gname=bin mode=0755
+bin	type=dir uname=bin gname=bin mode=0755
+..
+
+/set type=file uname=games gname=bin mode=0700
+games	type=dir uname=bin gname=bin mode=0755
+	hide	type=dir uname=games gname=bin mode=0700
 	..
-	locale
-		Ja_JP.EUC
+..
+
+/set type=file uname=bin gname=bin mode=0755
+include	type=dir uname=bin gname=bin mode=0755
+	arpa		type=dir uname=bin gname=bin mode=0755
+	..
+	g++		type=dir uname=bin gname=bin mode=0755
+		gen	type=dir uname=bin gname=bin mode=0755
 		..
-		POSIX
-		..
-		Russian.koi8-r
-		..
-		ja_JP.EUC
-		..
-		ru_SU.KOI8-R
+		sys	type=dir uname=bin gname=bin mode=0755
 		..
 	..
-/set type=dir uname=man gname=bin mode=0755
-        man             uname=bin
-            cat1           
-            ..
-            cat2           
-            ..
-            cat3           
-            ..
-            cat4           
-                i386           
-                ..
-            ..
-            cat5           
-            ..
-            cat6           
-            ..
-            cat7           
-            ..
-            cat8           
-                i386           
-                ..
-            ..
-            man1            uname=bin
-            ..
-            man2            uname=bin
-            ..
-            man3            uname=bin
-            ..
-/set type=dir uname=bin gname=bin mode=0755
-            man4           
-                i386           
-                ..
-            ..
-            man5           
-            ..
-            man6           
-            ..
-            man7           
-            ..
-            man8           
-                i386           
-                ..
-            ..
-        ..
-        me             
-        ..
-        misc           
-            fonts          
-            ..
-        ..
-        mk             
-        ..
-	perl
+	objc		type=dir uname=bin gname=bin mode=0755
 	..
-        skel           
-        ..
-        syscons        
-            fonts          
-            ..
-            keymaps        
-            ..
-            scrnmaps       
-            ..
-        ..
-        tabset         
-        ..
-        tmac           
-            mm             
-            ..
-        ..
-/set type=dir uname=bin gname=bin mode=0555
-        zoneinfo        mode=0755
-            Africa         
-            ..
-            America        
-            ..
-            Asia           
-            ..
-            Atlantic       
-            ..
-            Australia      
-            ..
-            Etc            
-            ..
-            Europe         
-            ..
-            Pacific        
-            ..
-            SystemV        
-            ..
-        ..
-    ..
-    src             mode=0755
-    ..
+	protocols	type=dir uname=bin gname=bin mode=0755
+	..
+	rpc		type=dir uname=bin gname=bin mode=0755
+	..
+..
+
+/set type=file uname=bin gname=bin mode=0755
+lib	type=dir uname=bin gname=bin mode=0755
+..
+
+/set type=file uname=bin gname=bin mode=0755
+libexec	type=dir uname=bin gname=bin mode=0755
+	lpr	type=dir uname=bin gname=bin mode=0755
+	..
+	uucp    type=dir uname=bin gname=bin mode=0755
+	..
+..
+
+local	type=dir uname=bin gname=bin mode=0755
+..
+
+mdec	type=dir uname=bin gname=bin mode=0755
+..
+
+obj	type=dir uname=bin gname=bin mode=0755
+..
+
+sbin	type=dir uname=bin gname=bin mode=0755
+..
+
+share	type=dir uname=bin gname=bin mode=0755
+	calendar	type=dir uname=bin gname=bin mode=0755
+	..
+
+	dict		type=dir uname=bin gname=bin mode=0755
+	..
+
+	/set type=file uname=games gname=bin mode=0755
+	games	type=dir uname=bin
+		atc	type=dir uname=games gname=bin mode=0755
+		..
+		fortune	type=dir uname=games gname=bin mode=0755
+		..
+		larn	type=dir uname=games gname=bin mode=0755
+		..
+	..
+
+	/set type=file uname=bin gname=bin mode=0755
+	groff_font			type=dir uname=bin gname=bin mode=0755
+		devX100			type=dir uname=bin gname=bin mode=0755
+		..
+		devX100-12		type=dir uname=bin gname=bin mode=0755
+		..
+		devX75			type=dir uname=bin gname=bin mode=0755
+		..
+		devX75-12		type=dir uname=bin gname=bin mode=0755
+		..
+		devascii		type=dir uname=bin gname=bin mode=0755
+		..
+		devdvi			type=dir uname=bin gname=bin mode=0755
+			generate	type=dir uname=bin gname=bin mode=0755
+			..
+		..
+		devlatin1		type=dir uname=bin gname=bin mode=0755
+		..
+		devps			type=dir uname=bin gname=bin mode=0755
+			generate	type=dir uname=bin gname=bin mode=0755
+			..
+		..
+	..
+
+	/set type=file uname=bin gname=bin mode=0755
+	man	type=dir uname=bin gname=bin mode=0755
+		cat1	type=dir uname=man gname=bin mode=0755
+		..
+		cat2	type=dir uname=man gname=bin mode=0755
+		..
+		cat3	type=dir uname=man gname=bin mode=0755
+		..
+		cat4	type=dir uname=man gname=bin mode=0755
+			i386	type=dir uname=man gname=bin mode=0755
+			..
+		..
+		cat5	type=dir uname=man gname=bin mode=0755
+		..
+		cat6	type=dir uname=man gname=bin mode=0755
+		..
+		cat7	type=dir uname=man gname=bin mode=0755
+		..
+		cat8	type=dir uname=man gname=bin mode=0755
+			i386	type=dir uname=man gname=bin mode=0755
+			..
+		..
+		man1	type=dir uname=bin gname=bin mode=0755
+		..
+		man2	type=dir uname=bin gname=bin mode=0755
+		..
+		man3	type=dir uname=bin gname=bin mode=0755
+		..
+		man4	type=dir uname=bin gname=bin mode=0755
+			i386	type=dir uname=bin gname=bin mode=0755
+			..
+		..
+		man5	type=dir uname=bin gname=bin mode=0755
+		..
+		man6	type=dir uname=bin gname=bin mode=0755
+		..
+		man7	type=dir uname=bin gname=bin mode=0755
+		..
+		man8	type=dir uname=bin gname=bin mode=0755
+			i386	type=dir uname=bin gname=bin mode=0755
+			..
+		..
+	..
+	me	type=dir uname=bin gname=bin mode=0755
+	..
+	misc	type=dir uname=bin gname=bin mode=0755
+		fonts	type=dir uname=bin gname=bin mode=0755
+		..
+	..
+	mk	type=dir uname=bin gname=bin mode=0755
+	..
+	skel	type=dir uname=bin gname=bin mode=0755
+	..
+	syscons	type=dir uname=bin gname=bin mode=0755
+		fonts	type=dir uname=bin gname=bin mode=0755
+		..
+		keymaps	type=dir uname=bin gname=bin mode=0755
+		..
+		scrnmaps type=dir uname=bin gname=bin mode=0755
+		..
+	..
+	tabset	type=dir uname=bin gname=bin mode=0755
+	..
+	tmac	type=dir uname=bin gname=bin mode=0755
+		mm	type=dir uname=bin gname=bin mode=0755
+		..
+	..
+	zoneinfo	type=dir uname=bin gname=bin mode=0755
+		Africa		type=dir uname=bin gname=bin mode=0555
+		..
+		America		type=dir uname=bin gname=bin mode=0555
+		..
+		Asia		type=dir uname=bin gname=bin mode=0555
+		..
+		Atlantic	type=dir uname=bin gname=bin mode=0555
+		..
+		Australia	type=dir uname=bin gname=bin mode=0555
+		..
+		Brazil		type=dir uname=bin gname=bin mode=0555
+		..
+		Canada		type=dir uname=bin gname=bin mode=0555
+		..
+		Chile		type=dir uname=bin gname=bin mode=0555
+		..
+		Europe		type=dir uname=bin gname=bin mode=0555
+		..
+		Indian		type=dir uname=bin gname=bin mode=0555
+		..
+		Mexico		type=dir uname=bin gname=bin mode=0555
+		..
+		Pacific		type=dir uname=bin gname=bin mode=0555
+		..
+		SystemV		type=dir uname=bin gname=bin mode=0555
+		..
+		US		type=dir uname=bin gname=bin mode=0555
+		..
+		posix		type=dir uname=bin gname=bin mode=0555
+			Africa		type=dir uname=bin gname=bin mode=0555
+			..
+			America		type=dir uname=bin gname=bin mode=0555
+			..
+			Asia		type=dir uname=bin gname=bin mode=0555
+			..
+			Atlantic	type=dir uname=bin gname=bin mode=0555
+			..
+			Australia	type=dir uname=bin gname=bin mode=0555
+			..
+			Brazil		type=dir uname=bin gname=bin mode=0555
+			..
+			Canada		type=dir uname=bin gname=bin mode=0555
+			..
+			Chile		type=dir uname=bin gname=bin mode=0555
+			..
+			Europe		type=dir uname=bin gname=bin mode=0555
+			..
+			Indian		type=dir uname=bin gname=bin mode=0555
+			..
+			Mexico		type=dir uname=bin gname=bin mode=0555
+			..
+			Pacific		type=dir uname=bin gname=bin mode=0555
+			..
+			SystemV		type=dir uname=bin gname=bin mode=0555
+			..
+			US		type=dir uname=bin gname=bin mode=0555
+			..
+		..
+		right		type=dir uname=bin gname=bin mode=0555
+			Africa		type=dir uname=bin gname=bin mode=0555
+			..
+			America		type=dir uname=bin gname=bin mode=0555
+			..
+			Asia		type=dir uname=bin gname=bin mode=0555
+			..
+			Atlantic	type=dir uname=bin gname=bin mode=0555
+			..
+			Australia	type=dir uname=bin gname=bin mode=0555
+			..
+			Brazil		type=dir uname=bin gname=bin mode=0555
+			..
+			Canada		type=dir uname=bin gname=bin mode=0555
+			..
+			Chile		type=dir uname=bin gname=bin mode=0555
+			..
+			Europe		type=dir uname=bin gname=bin mode=0555
+			..
+			Indian		type=dir uname=bin gname=bin mode=0555
+			..
+			Mexico		type=dir uname=bin gname=bin mode=0555
+			..
+			Pacific		type=dir uname=bin gname=bin mode=0555
+			..
+			SystemV		type=dir uname=bin gname=bin mode=0555
+			..
+			US		type=dir uname=bin gname=bin mode=0555
+			..
+		..
+	..
+..
+src type=dir uname=bin gname=bin mode=0755
 ..

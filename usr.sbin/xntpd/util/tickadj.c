@@ -7,16 +7,8 @@
  */
 #include <stdio.h>
 
-#if !defined(SYS_VAX) && !defined(SYS_BSD)
-#include <unistd.h>
-#endif /* SYS_VAX */
-
-#if defined(HAVE_GETBOOTFILE)
-#include <paths.h>
-#endif
-
 #ifdef SYS_LINUX
-#include "sys/timex.h"
+#include <sys/timex.h>
 
 struct timex txc;
 
@@ -50,9 +42,7 @@ main(int argc, char ** argv)
 #else /* not Linux... kmem tweaking: */
 
 #include <sys/types.h>
-#ifndef SYS_BSD
 #include <sys/file.h>
-#endif
 #include <sys/stat.h>
 
 #if defined(SYS_AUX3) || defined(SYS_AUX2)
@@ -79,7 +69,7 @@ main(int argc, char ** argv)
 #endif
 #endif
 
-#if defined(SYS_PTX) || defined(SYS_IX86OSF1)
+#ifdef SYS_PTX
 #define L_SET SEEK_SET
 #endif
 
@@ -430,30 +420,24 @@ getoffsets(filex, tick_off, tickadj_off, dosync_off, noprintf_off)
 		{""},
 	};
 #endif
-	char *kernels[] = {
-		"/kernel",
+	static char *kernels[] = {
 		"/vmunix",
 		"/unix",
 		"/mach",
 		"/kernel/unix",
 		"/386bsd",
 		"/netbsd",
+		"/hp-ux",
 		NULL
 	};
 	struct stat stbuf;
 
-#ifdef HAVE_GETBOOTFILE
-	*kname = getbootfile();
-	if (stat(*kname, &stbuf) == -1 || nlist(*kname, nl) == -1)
-		*kname = NULL;
-#else
 	for (kname = kernels; *kname != NULL; kname++) {
 		if (stat(*kname, &stbuf) == -1)
 			continue;
 		if (nlist(*kname, nl) >= 0) 
 			break;
 	}
-#endif
 	if (*kname == NULL) {
 		(void) fprintf(stderr,
 		    "%s: nlist fails: can't find/read /vmunix or /unix\n",
@@ -573,7 +557,7 @@ readvar(fd, off, var)
 	}
 	if (i != sizeof(int)) {
 		(void) fprintf(stderr, "%s: read expected %d, got %d\n",
-		    progname, (int)sizeof(int), i);
+		    progname, sizeof(int), i);
 		exit(1);
 	}
 }

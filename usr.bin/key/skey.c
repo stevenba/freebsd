@@ -12,13 +12,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #ifdef	__MSDOS__
 #include <dos.h>
 #else	/* Assume BSD unix */
 #include <fcntl.h>
 #endif
-
+#include "libskey/md4.h"
 #include <skey.h>
 
 char *readpass();
@@ -120,10 +119,10 @@ char *argv[];
 	}
 	return 0;
 }
-
 void
 usage(s)
 char *s;
 {
 	fprintf(stderr,"Usage: %s [-n count] <sequence #>[/] <key> \n",s);
 }
+

@@ -1,4 +1,4 @@
-/*
+/* ntp_leap.c,v 3.1 1993/07/06 01:11:18 jbj Exp
  * ntp_leap - maintain leap bits and take action when a leap occurs
  */
 #include <stdio.h>
@@ -41,7 +41,7 @@ u_char leap_mask;		/* set on day before a potential leap */
  * Timer.  The timer code imports this so it can call us prior to
  * calling out any pending transmits.
  */
-u_long leap_timer;
+U_LONG leap_timer;
 
 /*
  * We don't want to do anything drastic if the leap function is handled
@@ -67,18 +67,18 @@ u_char leapbits;
 /*
  * Imported from the timer module.
  */
-extern u_long current_time;
+extern U_LONG current_time;
 
 
 /*
  * Some statistics counters
  */
-u_long leap_processcalls;	/* calls to leap_process */
-u_long leap_notclose;		/* leap found to be a long time from now */
-u_long leap_monthofleap;	/* in the month of a leap */
-u_long leap_dayofleap;		/* This is the day of the leap */
-u_long leap_hoursfromleap;	/* only 2 hours from leap */
-u_long leap_happened;		/* leap process saw the leap */
+U_LONG leap_processcalls;	/* calls to leap_process */
+U_LONG leap_notclose;		/* leap found to be a LONG time from now */
+U_LONG leap_monthofleap;	/* in the month of a leap */
+U_LONG leap_dayofleap;		/* This is the day of the leap */
+U_LONG leap_hoursfromleap;	/* only 2 hours from leap */
+U_LONG leap_happened;		/* leap process saw the leap */
 
 /*
  * Imported from the main module
@@ -86,7 +86,7 @@ u_long leap_happened;		/* leap process saw the leap */
 extern int debug;
 
 
-static void	setnexttimeout	P((u_long));
+static void	setnexttimeout	P((U_LONG));
 
 /*
  * init_leap - initialize the leap module's data.
@@ -114,18 +114,18 @@ init_leap()
 void
 leap_process()
 {
-	u_long leapnext;
-	u_long leaplast;
+	U_LONG leapnext;
+	U_LONG leaplast;
 	l_fp ts;
 	u_char bits;
 	extern u_char sys_leap;
 
 	leap_processcalls++;
 	get_systime(&ts);
-	calleapwhen((u_long)ts.l_ui, &leaplast, &leapnext);
+	calleapwhen(ts.l_ui, &leaplast, &leapnext);
 
 	/*
-	 * Figure out what to do based on how long to the next leap.
+	 * Figure out what to do based on how LONG to the next leap.
 	 */
 	if (leapnext > OKAYTOSETWARNING) {
 		if (leaplast < ONEMINUTE) {
@@ -189,7 +189,7 @@ leap_process()
 		 * recomputed.
 		 */
 		if ((leapnext - DAYBEFORE) >= DAYBEFORE)
-			setnexttimeout((u_long)DAYBEFORE);
+			setnexttimeout((U_LONG)DAYBEFORE);
 		else
 			setnexttimeout(leapnext - DAYBEFORE);
 		return;
@@ -223,7 +223,7 @@ leap_process()
  */
 static void
 setnexttimeout(secs)
-	u_long secs;
+	U_LONG secs;
 {
 	/*
 	 * We try to aim the time out at between 1 and 1+(1<<EVENT_TIMEOUT)
@@ -243,13 +243,13 @@ leap_setleap(indicator, warning)
 	int indicator;
 	int warning;
 {
-	u_long leapnext;
-	u_long leaplast;
+	U_LONG leapnext;
+	U_LONG leaplast;
 	l_fp ts;
 	int i;
 
 	get_systime(&ts);
-	calleapwhen((u_long)ts.l_ui, &leaplast, &leapnext);
+	calleapwhen(ts.l_ui, &leaplast, &leapnext);
 
 	i = 0;
 	if (warning != ~0)

@@ -36,19 +36,6 @@
  *   of this software, nor does the author assume any responsibility
  *   for damages incurred with its use.
  */
-/*
- * I doubled delay loops in this file because it is not enough for some
- * laptop machines' PCIC (especially, on my Chaplet ILFA 350 ^^;). 
- *                        HOSOKAWA, Tatsumi <hosokawa@mt.cs.keio.ac.jp>
- */ 
-/*
- * Very small patch for IBM Ethernet PCMCIA Card II and IBM ThinkPad230Cs.
- *			ETO, Toshihisa <eto@osl.fujitsu.co.jp>
- */
-
-/*
- * $Id$
- */
 
 #include "ze.h"
 #if	NZE > 0
@@ -89,6 +76,8 @@
 #include "i386/isa/isa_device.h"
 #include "i386/isa/icu.h"
 #include "i386/isa/if_zereg.h"
+
+#include "i386/include/pio.h"
 
  
 
@@ -381,7 +370,7 @@ pcic_power_on (int slot)
 {
     pcic_putb (slot, PCIC_POWER,
 	       pcic_getb (slot, PCIC_POWER) | PCIC_DISRST | PCIC_PCPWRE);
-    DELAY (100000);
+    DELAY (50000);
     pcic_putb (slot, PCIC_POWER,
 	       pcic_getb (slot, PCIC_POWER) | PCIC_OUTENA);
 }
@@ -392,7 +381,7 @@ pcic_reset (int slot)
     /* assert RESET (by clearing a bit!), wait a bit, and de-assert it */
     pcic_putb (slot, PCIC_INT_GEN,
 	       pcic_getb (slot, PCIC_INT_GEN) & ~PCIC_CARDRESET);
-    DELAY (100000);
+    DELAY (50000);
     pcic_putb (slot, PCIC_INT_GEN,
 	       pcic_getb (slot, PCIC_INT_GEN) | PCIC_CARDRESET);
 }
@@ -437,8 +426,6 @@ struct	ze_softc {
 	u_char	rec_page_start;	/* first page of RX ring-buffer */
 	u_char	rec_page_stop;	/* last page of RX ring-buffer */
 	u_char	next_packet;	/* pointer to next unread RX packet */
-	u_char	last_alive;	/* information for reconfiguration */
-	u_char	last_up;	/* information for reconfiguration */
 } ze_softc[NZE];
 
 int	ze_attach(), ze_ioctl(), ze_probe();
@@ -448,6 +435,8 @@ void	ze_reset(), ze_watchdog(), ze_get_packet();
 static inline void ze_rint();
 static inline void ze_xmit();
 static inline char *ze_ring_copy();
+
+extern int ether_output();
 
 struct isa_driver zedriver = {
 	ze_probe,
@@ -464,11 +453,6 @@ static unsigned char enet_addr[6];
 static unsigned char card_info[256];
  
 #define CARD_INFO  "IBM Corp.~Ethernet~0933495"
-
-/*
- * IBM Ethernet PCMCIA Card II returns following info.
- */
-#define CARD2_INFO  "IBM Corp.~Ethernet~0934214"
 
 /*
  * scan the card information structure looking for the version/product info
@@ -501,15 +485,7 @@ ze_check_cis (unsigned char *scratch)
 	    for (j = i+8; scratch[j] != 0xff; j += 2)
 		card_info[k++] = scratch[j] == '\0' ? '~' : scratch[j];
 	    card_info[k++] = '\0';
-#if 0
 	    return (memcmp (card_info, CARD_INFO, sizeof(CARD_INFO)-1) == 0);
-#else
-	    if ((memcmp (card_info, CARD_INFO, sizeof(CARD_INFO)-1) == 0) ||
-		(memcmp (card_info, CARD2_INFO, sizeof(CARD2_INFO)-1) == 0)) {
-		return 1;
-	    }
-	    return 0;
-#endif
 	}
 	i += 4 + 2 * link;
     }
@@ -530,7 +506,7 @@ ze_check_cis (unsigned char *scratch)
  */
 
 static int
-ze_find_adapter (unsigned char *scratch, int reconfig)
+ze_find_adapter (unsigned char *scratch)
 {
     int slot;
 
@@ -540,13 +516,9 @@ ze_find_adapter (unsigned char *scratch, int reconfig)
 	 * Intel PCMCIA controllers use 0x82 and 0x83
 	 * IBM clone chips use 0x88 and 0x89, apparently
 	 */
-	/*
-	 * IBM ThinkPad230Cs use 0x84.
-	 */
 	unsigned char idbyte = pcic_getb (slot, PCIC_ID_REV);
 
 	if (idbyte != 0x82 && idbyte != 0x83 &&
-	    idbyte != 0x84 &&			/* for IBM ThinkPad 230Cs */
 	    idbyte != 0x88 && idbyte != 0x89) {
 #if 0
 	    printf ("ibmccae: pcic slot %d: wierd id/rev code 0x%02x\n",
@@ -555,9 +527,7 @@ ze_find_adapter (unsigned char *scratch, int reconfig)
 	    continue;
 	}
 	if ((pcic_getb (slot, PCIC_STATUS) & PCIC_CD) != PCIC_CD) {
-	    if (!reconfig) {
-		printf ("ze: slot %d: no card in slot\n", slot);
-	    }
+	    printf ("ze: slot %d: no card in slot\n", slot);
 	    /* no card in slot */
 	    continue;
 	}
@@ -573,16 +543,11 @@ ze_find_adapter (unsigned char *scratch, int reconfig)
 	
 	if ((ze_check_cis (scratch)) > 0) {
 	    /* found it */
-	    if (!reconfig) {
-		printf ("ze: found card in slot %d\n", slot);
-	    }
+	    printf ("ze: found card in slot %d\n", slot);
 	    return slot;
 	}
-	else {
-	    if (!reconfig) {
-		printf ("ze: pcmcia slot %d: %s\n", slot, card_info);
-	    }
-	}
+	else
+	    printf ("ze: pcmcia slot %d: %s\n", slot, card_info);
 	pcic_unmap_memory (slot, 0);
     }
     return -1;
@@ -616,7 +581,7 @@ ze_probe(isa_dev)
 	u_char iptr, memwidth, sum, tmp;
 	int slot;
 
-        if ((slot = ze_find_adapter (isa_dev->id_maddr, isa_dev->id_reconfig)) < 0)
+        if ((slot = ze_find_adapter (isa_dev->id_maddr)) < 0)
 	    return NULL;
 
 	/*
@@ -666,7 +631,7 @@ ze_probe(isa_dev)
 	pcic_map_memory (slot, 0, kvtop (isa_dev->id_maddr), 0x20000, 8L,
 			 ATTRIBUTE, 1);
 	POKE(isa_dev->id_maddr, 0x80);	/* reset the card (how long?) */
-	DELAY (40000);
+	DELAY (10000);
 	/*
 	 * Set the configuration index.  According to [1], the adapter won't
 	 * respond to any i/o signals until we do this; it uses the
@@ -745,9 +710,9 @@ ze_probe(isa_dev)
 
 	/* reset card to force it into a known state */
 	tmp = inb (isa_dev->id_iobase + ZE_RESET);
-	DELAY(20000);
+	DELAY(5000);
 	outb (isa_dev->id_iobase + ZE_RESET, tmp);
-	DELAY(20000);
+	DELAY(5000);
 
 	/*
 	 * query MAM bit in misc register for 10base2
@@ -774,18 +739,12 @@ ze_probe(isa_dev)
 		sc->arpcom.ac_enaddr[i] = enet_addr[i];
 	
 	isa_dev->id_msize = memsize;
-
-
-	/* information for reconfiguration */
-	sc->last_alive = 0;
-	sc->last_up = 0;
 	return 32;
 }
  
 /*
  * Install interface into kernel networking data structures
  */
-
 int
 ze_attach(isa_dev)
 	struct isa_device *isa_dev;
@@ -794,26 +753,6 @@ ze_attach(isa_dev)
 	struct ifnet *ifp = &sc->arpcom.ac_if;
 	struct ifaddr *ifa;
 	struct sockaddr_dl *sdl;
-
-	/* PCMCIA card can be offlined. Reconfiguration is required */
-	if (isa_dev->id_reconfig) {
-		if (!isa_dev->id_alive && sc->last_alive) {
-			sc->last_up = (ifp->if_flags & IFF_UP);
-			ifp->if_flags &= ~(IFF_UP);
-			sc->last_alive = 0;
-		}
-		if (isa_dev->id_alive && !sc->last_alive) {
-			if (sc->last_up) {
-				ifp->if_flags |= IFF_UP;
-			}
-			sc->last_alive = 1;
-		}
-		ze_reset(isa_dev->id_unit);
-		return 1;
-	}
-	else {
-		sc->last_alive = 1;
-	}
  
 	/*
 	 * Set interface to stopped condition (reset)
@@ -834,12 +773,12 @@ ze_attach(isa_dev)
 	ifp->if_watchdog = ze_watchdog;
 
 	/*
-	 * Set default state for IIF_LINK0 flag (used to disable the tranceiver
+	 * Set default state for LLC0 flag (used to disable the tranceiver
 	 *	for AUI operation), based on compile-time config option.
 	 */
 	if (isa_dev->id_flags & ZE_FLAGS_DISABLE_TRANCEIVER)
 		ifp->if_flags = (IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS
-			| IFF_LINK0);
+			| IFF_LLC0);
 	else
 		ifp->if_flags = (IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS);
 
@@ -878,7 +817,7 @@ ze_attach(isa_dev)
 	       isa_dev->id_unit,
 	       ether_sprintf(sc->arpcom.ac_enaddr), sc->type_str,
 	       sc->memwidth,
-	       (ifp->if_flags & IFF_LINK0 ? " [tranceiver disabled]" : ""),
+	       (ifp->if_flags & IFF_LLC0 ? " [tranceiver disabled]" : ""),
 	       sc->mau);
 
 	/*
@@ -887,7 +826,6 @@ ze_attach(isa_dev)
 #if NBPFILTER > 0
 	bpfattach(&sc->bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
 #endif
-
 	return 1;
 }
  
@@ -1109,7 +1047,7 @@ ze_init(unit)
 	 *	(there is no settable hardware default).
 	 */
 	if (sc->vendor == ZE_VENDOR_3COM) {
-		if (ifp->if_flags & IFF_LINK0) {
+		if (ifp->if_flags & IFF_LLC0) {
 			outb(sc->asic_addr + ZE_3COM_CR, 0);
 		} else {
 			outb(sc->asic_addr + ZE_3COM_CR, ZE_3COM_CR_XSEL);
@@ -1271,7 +1209,7 @@ outloop:
 		}
 #endif
 
-	sc->txb_next_len = max(len, ETHER_MIN_LEN);
+	sc->txb_next_len = MAX(len, ETHER_MIN_LEN);
 
 	if (sc->txb_cnt > 1)
 		/*
@@ -1726,17 +1664,6 @@ ze_ioctl(ifp, command, data)
 
 	case SIOCSIFFLAGS:
 		/*
-		 * When the card is offlined, `up' operation can't be permitted
-		 */
-		if (!sc->last_alive) {
-			int tmp;
-			tmp = (ifp->if_flags & IFF_UP);
-			if (!sc->last_up && (ifp->if_flags & IFF_UP)) {
-				ifp->if_flags &= ~(IFF_UP);
-			}
-			sc->last_up = tmp;
-		}
-		/*
 		 * If interface is marked down and it is running, then stop it
 		 */
 		if (((ifp->if_flags & IFF_UP) == 0) &&
@@ -1778,7 +1705,7 @@ ze_ioctl(ifp, command, data)
 		 *	the tranceiver if set.
 		 */
 		if (sc->vendor == ZE_VENDOR_3COM) {
-			if (ifp->if_flags & IFF_LINK0) {
+			if (ifp->if_flags & IFF_LLC0) {
 				outb(sc->asic_addr + ZE_3COM_CR, 0);
 			} else {
 				outb(sc->asic_addr + ZE_3COM_CR, ZE_3COM_CR_XSEL);
