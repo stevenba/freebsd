@@ -5,11 +5,12 @@
 .PATH: ${GCCDIR}
 
 PROG=	cpp0
-SRCS=	cccp.c cexp.y obstack.c prefix.c version.c
-YFLAGS=
+SRCS=	cppmain.c 
+
 BINDIR=	/usr/libexec
-NOSHARED?=yes
-MAN=	cccp.1
-MLINKS=	cccp.1 cpp.1
+NOMAN=	1
+
+DPADD+=	${LIBCC_INT}
+LDADD+=	${LIBCC_INT}
 
 .include <bsd.prog.mk>
