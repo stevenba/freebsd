@@ -27,7 +27,7 @@
  */
 
 
-#include <sys/types.h>
+#include <sys/param.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -35,15 +35,24 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(__FreeBSD__) && !defined(NOKLDLOAD)
+#include <sys/linker.h>
+#include <sys/module.h>
+#endif
 #include <termios.h>
 #if !defined(__FreeBSD__) || __FreeBSD__ < 3
 #include <time.h>
 #endif
 #include <unistd.h>
 
+#if defined(__FreeBSD__) && !defined(NOKLDLOAD)
+#include "id.h"
+#include "log.h"
+#endif
 #include "defs.h"
 
 #define	issep(c)	((c) == '\t' || (c) == ' ')
@@ -387,4 +396,20 @@ void
 zerofdset(fd_set *s)
 {
   memset(s, '\0', howmany(getdtablesize(), NFDBITS) * sizeof (fd_mask));
+}
+
+void
+loadmodules(const char *module, ...)
+{
+#if defined(__FreeBSD__) && !defined(NOKLDLOAD)
+  va_list ap;
+
+  va_start(ap, module);
+  while (module != NULL) {
+    if (modfind(module) == -1 && ID0kldload(module) == -1)
+      log_Printf(LogWARN, "%s: Cannot load module\n", module);
+    module = va_arg(ap, const char *);
+  }
+  va_end(ap);
+#endif
 }

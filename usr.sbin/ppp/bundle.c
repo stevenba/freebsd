@@ -50,12 +50,6 @@
 #include <string.h>
 #include <sys/uio.h>
 #include <sys/wait.h>
-#if defined(__FreeBSD__) && !defined(NOKLDLOAD)
-#ifdef NOSUID
-#include <sys/linker.h>
-#endif
-#include <sys/module.h>
-#endif
 #include <termios.h>
 #include <unistd.h>
 
@@ -707,13 +701,8 @@ bundle_Create(const char *prefix, int type, int unit)
 	 * Attempt to load the tunnel interface KLD if it isn't loaded
 	 * already.
          */
-        if (modfind("if_tun") == -1) {
-          if (ID0kldload("if_tun") != -1) {
-            bundle.unit--;
-            continue;
-          }
-          log_Printf(LogWARN, "kldload: if_tun: %s\n", strerror(errno));
-        }
+        loadmodules("if_tun", NULL);
+        continue;
       }
 #endif
       err = errno;

@@ -47,10 +47,6 @@
 #include <string.h>
 #include <sysexits.h>
 #include <sys/fcntl.h>
-#if defined(__FreeBSD__) && !defined(NOKLDLOAD)
-#include <sys/linker.h>
-#include <sys/module.h>
-#endif
 #include <sys/uio.h>
 #include <termios.h>
 #include <sys/time.h>
@@ -416,24 +412,7 @@ ether_Create(struct physical *p)
 
     p->fd--;				/* We own the device - change fd */
 
-#if defined(__FreeBSD__) && !defined(NOKLDLOAD)
-    if (modfind("netgraph") == -1) {
-      log_Printf(LogWARN, "Netgraph is not built into the kernel\n");
-      return NULL;
-    }
-
-    if (modfind("ng_ether") == -1 && ID0kldload("ng_ether") == -1)
-      /*
-       * Don't treat this as an error as older kernels have this stuff
-       * built in as part of the netgraph node itself.
-       */
-      log_Printf(LogWARN, "kldload: ng_ether: %s\n", strerror(errno));
-
-    if (modfind("ng_socket") == -1 && ID0kldload("ng_socket") == -1) {
-      log_Printf(LogWARN, "kldload: ng_socket: %s\n", strerror(errno));
-      return NULL;
-    }
-#endif
+    loadmodules("netgraph", "ng_ether", "ng_pppoe", "ng_socket", NULL);
 
     if ((dev = malloc(sizeof *dev)) == NULL)
       return NULL;

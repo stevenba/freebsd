@@ -34,32 +34,23 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sysexits.h>
 #include <sys/uio.h>
 #include <termios.h>
 #include <unistd.h>
-#if defined(__FreeBSD__) && !defined(NOKLDLOAD) && !defined(NONETGRAPH)
-#include <stdio.h>
-#ifdef NOSUID
-#include <sys/linker.h>
-#endif
 #include <netgraph.h>
 #include <netgraph/ng_async.h>
 #include <netgraph/ng_message.h>
 #include <netgraph/ng_ppp.h>
 #include <netgraph/ng_tty.h>
-#include <sys/module.h>
-#endif
 
 #include "layer.h"
 #include "defs.h"
 #include "mbuf.h"
 #include "log.h"
-#if defined(__FreeBSD__) && !defined(NOKLDLOAD) && !defined(NONETGRAPH)
-#include "id.h"
-#endif
 #include "timer.h"
 #include "lqr.h"
 #include "hdlc.h"
@@ -78,6 +69,7 @@
 #include "cbcp.h"
 #include "datalink.h"
 #include "main.h"
+#include "id.h"
 #include "tty.h"
 
 #if defined(__mac68k__) || defined(__macppc__)
@@ -269,12 +261,7 @@ LoadLineDiscipline(struct physical *p)
   reply = (struct ng_mesg *)rbuf;
   info = (struct nodeinfo *)reply->data;
 
-#if defined(__FreeBSD__) && !defined(NOKLDLOAD)
-  if (modfind("ng_tty") == -1)
-    ID0kldload("ng_tty");
-  if (modfind("ng_async") == -1)
-    ID0kldload("ng_async");
-#endif
+  loadmodules("netgraph", "ng_tty", "ng_async", "ng_socket", NULL);
 
   /* Get the speed before loading the line discipline */
   speed = physical_GetSpeed(p);
