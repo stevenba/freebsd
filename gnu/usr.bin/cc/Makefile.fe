@@ -1,5 +1,0 @@
-# $FreeBSD$
-
-#	Front-end-only bits
-
-version!=	sed -n /version_string/p ${GCCDIR}/version.c | sed -e 's/.*\"\([^ \"]*\)[ \"].*/\1/'
