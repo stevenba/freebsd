@@ -404,11 +404,19 @@ main (argc, argv)
     else
     {
 	command_name = cm->fullname;	/* Global pointer for later use */
+
+	/* make sure we clean up on error */
 	(void) SIG_register (SIGHUP, main_cleanup);
 	(void) SIG_register (SIGINT, main_cleanup);
 	(void) SIG_register (SIGQUIT, main_cleanup);
 	(void) SIG_register (SIGPIPE, main_cleanup);
 	(void) SIG_register (SIGTERM, main_cleanup);
+
+	(void) SIG_register (SIGHUP, Lock_Cleanup);
+	(void) SIG_register (SIGINT, Lock_Cleanup);
+	(void) SIG_register (SIGQUIT, Lock_Cleanup);
+	(void) SIG_register (SIGPIPE, Lock_Cleanup);
+	(void) SIG_register (SIGTERM, Lock_Cleanup);
 
 #ifdef HAVE_SETVBUF
 	/*

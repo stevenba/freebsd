@@ -158,13 +158,6 @@ Reader_Lock (xrepository)
     /* remember what we're locking (for lock_cleanup) */
     repository = xrepository;
 
-    /* make sure we clean up on error */
-    (void) SIG_register (SIGHUP, Lock_Cleanup);
-    (void) SIG_register (SIGINT, Lock_Cleanup);
-    (void) SIG_register (SIGQUIT, Lock_Cleanup);
-    (void) SIG_register (SIGPIPE, Lock_Cleanup);
-    (void) SIG_register (SIGTERM, Lock_Cleanup);
-
     /* make sure we can write the repository */
     (void) sprintf (tmp,
 #ifdef HAVE_LONG_FILE_NAMES
@@ -311,13 +304,6 @@ write_lock (repository)
 	    "%s.%d", CVSWFL,
 #endif
 	getpid());
-
-    /* make sure we clean up on error */
-    (void) SIG_register (SIGHUP, Lock_Cleanup);
-    (void) SIG_register (SIGINT, Lock_Cleanup);
-    (void) SIG_register (SIGQUIT, Lock_Cleanup);
-    (void) SIG_register (SIGPIPE, Lock_Cleanup);
-    (void) SIG_register (SIGTERM, Lock_Cleanup);
 
     /* make sure we can write the repository */
     (void) sprintf (tmp,
