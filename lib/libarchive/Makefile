@@ -1,2 +1,0 @@
-# $FreeBSD$
-.include "Makefile.freebsd"
