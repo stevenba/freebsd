@@ -94,8 +94,6 @@ static char sccsid[] = "@(#)portmap.c 1.32 87/08/06 Copyr 1984 Sun Micro";
 #include <sys/signal.h>
 #include <sys/resource.h>
 
-#include "pmap_check.h"
-
 void reg_service();
 void reap();
 static void callit();
@@ -113,21 +111,15 @@ main(argc, argv)
 	int len = sizeof(struct sockaddr_in);
 	register struct pmaplist *pml;
 
-	while ((c = getopt(argc, argv, "dv")) != EOF) {
+	while ((c = getopt(argc, argv, "d")) != EOF) {
 		switch (c) {
 
 		case 'd':
 			debugging = 1;
 			break;
 
-		case 'v':
-			verboselog = 1;
-			break;
-
 		default:
-			(void) fprintf(stderr, "usage: %s [-dv]\n", argv[0]);
-			(void) fprintf(stderr, "-d: debugging mode\n");
-			(void) fprintf(stderr, "-v: verbose logging\n");
+			(void) fprintf(stderr, "usage: %s [-d]\n", argv[0]);
 			exit(1);
 		}
 	}
@@ -190,8 +182,6 @@ main(argc, argv)
 
 	(void)svc_register(xprt, PMAPPROG, PMAPVERS, reg_service, FALSE);
 
-	/* additional initializations */
-	check_startup();
 	(void)signal(SIGCHLD, reap);
 	svc_run();
 	syslog(LOG_ERR, "run_svc returned unexpectedly");
@@ -240,13 +230,6 @@ reg_service(rqstp, xprt)
 	int ans, port;
 	caddr_t t;
 	
-	/*
-	 * Later wrappers change the logging severity on the fly. Reset to
-	 * defaults before handling the next request.
-	 */
-	allow_severity = LOG_INFO;
-	deny_severity = LOG_WARNING;
-
 	if (debugging)
 		(void) fprintf(stderr, "server: about do a switch\n");
 	switch (rqstp->rq_proc) {
@@ -255,8 +238,6 @@ reg_service(rqstp, xprt)
 		/*
 		 * Null proc call
 		 */
-		/* remote host authorization check */
-		check_default(svc_getcaller(xprt), rqstp->rq_proc, (u_long) 0);
 		if (!svc_sendreply(xprt, xdr_void, (caddr_t)0) && debugging) {
 			abort();
 		}
@@ -269,12 +250,6 @@ reg_service(rqstp, xprt)
 		if (!svc_getargs(xprt, xdr_pmap, &reg))
 			svcerr_decode(xprt);
 		else {
-			/* reject non-local requests, protect priv. ports */
-			if (!check_setunset(svc_getcaller(xprt), 
-			    rqstp->rq_proc, reg.pm_prog, reg.pm_port)) {
-				ans = 0;
-				goto done;
-			} 
 			/*
 			 * check to see if already used
 			 * find_service returns a hit even if
@@ -324,10 +299,6 @@ reg_service(rqstp, xprt)
 			svcerr_decode(xprt);
 		else {
 			ans = 0;
-			/* reject non-local requests */
-			if (!check_setunset(svc_getcaller(xprt), 
-			    rqstp->rq_proc, reg.pm_prog, (u_long) 0))
-				goto done;
 			for (prevpml = NULL, pml = pmaplist; pml != NULL; ) {
 				if ((pml->pml_map.pm_prog != reg.pm_prog) ||
 					(pml->pml_map.pm_vers != reg.pm_vers)) {
@@ -337,14 +308,6 @@ reg_service(rqstp, xprt)
 					continue;
 				}
 				/* found it; pml moves forward, prevpml stays */
-				/* privileged port check */
-				if (!check_privileged_port(svc_getcaller(xprt), 
-				    rqstp->rq_proc, 
-				    reg.pm_prog, 
-				    pml->pml_map.pm_port)) {
-					ans = 0;
-					break;
-				}
 				ans = 1;
 				t = (caddr_t)pml;
 				pml = pml->pml_next;
@@ -369,13 +332,6 @@ reg_service(rqstp, xprt)
 		if (!svc_getargs(xprt, xdr_pmap, &reg))
 			svcerr_decode(xprt);
 		else {
-			/* remote host authorization check */
-			if (!check_default(svc_getcaller(xprt), 
-			    rqstp->rq_proc, 
-			    reg.pm_prog)) {
-				ans = 0;
-				goto done;
-			}
 			fnd = find_service(reg.pm_prog, reg.pm_vers, reg.pm_prot);
 			if (fnd)
 				port = fnd->pml_map.pm_port;
@@ -396,16 +352,8 @@ reg_service(rqstp, xprt)
 		if (!svc_getargs(xprt, xdr_void, NULL))
 			svcerr_decode(xprt);
 		else {
-			/* remote host authorization check */
-			struct pmaplist *p;
-			if (!check_default(svc_getcaller(xprt), 
-			    rqstp->rq_proc, (u_long) 0)) {
-				p = 0;	/* send empty list */
-			} else {
-				p = pmaplist;
-			}
 			if ((!svc_sendreply(xprt, xdr_pmaplist,
-			    (caddr_t)&p)) && debugging) {
+			    (caddr_t)&pmaplist)) && debugging) {
 				(void) fprintf(stderr, "svc_sendreply\n");
 				abort();
 			}
@@ -424,8 +372,6 @@ reg_service(rqstp, xprt)
 		break;
 
 	default:
-		/* remote host authorization check */
-		check_default(svc_getcaller(xprt), rqstp->rq_proc, (u_long) 0);
 		svcerr_noproc(xprt);
 		break;
 	}
@@ -438,7 +384,7 @@ reg_service(rqstp, xprt)
 #define ARGSIZE 9000
 
 struct encap_parms {
-	u_int arglen;
+	u_long arglen;
 	char *args;
 };
 
@@ -553,10 +499,6 @@ callit(rqstp, xprt)
 	timeout.tv_usec = 0;
 	a.rmt_args.args = buf;
 	if (!svc_getargs(xprt, xdr_rmtcall_args, &a))
-		return;
-	/* host and service access control */
-	if (!check_callit(svc_getcaller(xprt), 
-	    rqstp->rq_proc, a.rmt_prog, a.rmt_proc))
 		return;
 	if ((pml = find_service(a.rmt_prog, a.rmt_vers,
 	    (u_long)IPPROTO_UDP)) == NULL)
