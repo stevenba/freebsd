@@ -1,7 +1,7 @@
                           Mirror Sites
                     For FreeBSD 2.0 and later
 
-$Id: MIRROR.SITES,v 1.17 1995/08/18 18:20:13 joerg Exp $
+$Id: MIRROR.SITES,v 1.9.2.4 1995/09/17 10:10:09 davidg Exp $
 
 The latest versions of FreeBSD (2.0 or later) are being mirrored at the
 following locations:
@@ -132,7 +132,7 @@ eBones (Kerberos) from one of the following foreign distribution sites:
 
 Country		Site and Maintainer
 =======		========================================================
-South Africa	ftp://skeleton.mikom.csir.co.za/pub/FreeBSD
+South Africa	ftp://ftp.internat.freebsd.org/pub/FreeBSD
 		Mark Murray <mark@grondar.za>
 
 South Africa	ftp://storm.sea.uct.ac.za/pub/FreeBSD
