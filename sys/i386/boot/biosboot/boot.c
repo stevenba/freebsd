@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, [92/04/03  16:51:14  rvb]
- *	$Id: boot.c,v 1.55 1996/08/28 18:29:51 ache Exp $
+ *	$Id: boot.c,v 1.56.2.3 1996/09/08 01:17:24 julian Exp $
  */
 
 
@@ -59,7 +59,7 @@ WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #define	ouraddr	(BOOTSEG << 4)		/* XXX */
 
-#define NAMEBUF_LEN	(8*1024)
+#define NAMEBUF_LEN	(8*1024) /* 8k for a name buffer ??*/ /*XXX*/
 
 #ifdef NAMEBLOCK
 char *dflt_name ;
@@ -133,20 +133,20 @@ boot(int drive)
 	/*
 	 * dflt_name is set by the code in boot.S via boot2.S
 	 */
-	if( (*dflt_name++ == 'D') && (*dflt_name++ == 'N')) {
-		name = dflt_name;
+	if( (dflt_name[0] == 'D') && (dflt_name[1] == 'N')) {
+		name = &dflt_name[2];
 	} else
 #endif	/*NAMEBLOCK*/
 loadstart:
 	name = dflname;
-#if 1
+#if 1	/* don't call strcpy, it's not loaded normally */
 	{
 		char *a = name;
 		char *b = namebuf;
 
 		while (*b++ = *a++);
 	}
-#else
+#else	/* if we could be sure that the names were < 64 bytes this is SMALL*/
 	bcopy(name,namebuf,64);
 #endif
 	/* print this all each time.. (saves space to do so) */
@@ -201,12 +201,6 @@ loadstart:
 						*howto |= RB_CONFIG;
 					if (c == 'd')
 						*howto |= RB_KDB;
-					if (c == 'h') {
-						*howto ^= RB_SERIAL;
-						if (*howto & RB_SERIAL)
-							init_serial();
-						continue;
-					}
 					if (c == 'g')
 						*howto |= RB_GDB;
 					if (c == 'r')
@@ -215,6 +209,12 @@ loadstart:
 						*howto |= RB_SINGLE;
 					if (c == 'v')
 						*howto |= RB_VERBOSE;
+					if (c == 'h') {
+						*howto ^= RB_SERIAL;
+						if (*howto & RB_SERIAL)
+							init_serial();
+						/*continue;*/
+					}
 				}
 			} else {
 				/*
@@ -224,9 +224,9 @@ loadstart:
 				 * The default string will at least hit this..
 				 */
 				name = ptr;
-				while (*++ptr != '\0') {
-					if (*ptr == ' ') {
-						*ptr++ = '\0';
+				while ((c = *++ptr) != '\0') {
+					if ( c == ' ') {
+						ptr[-1] = 0;
 						break;
 					}
 				}
