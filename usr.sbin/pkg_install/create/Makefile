@@ -1,8 +1,0 @@
-PROG= pkg_create
-
-CFLAGS+=	-I${.CURDIR}/../lib
-LDADD+=		-L${.CURDIR}/../lib -linstall
-
-SRCS= main.c perform.c pl.c
-
-.include <bsd.prog.mk>
