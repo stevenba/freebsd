@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
- *	$Id: sio.c,v 1.147.2.8 1997/05/11 12:57:38 bde Exp $
+ *	$Id: sio.c,v 1.147.2.8.2.1 1997/08/21 03:35:51 julian Exp $
  */
 
 #include "opt_comconsole.h"
@@ -95,6 +95,7 @@
 #define	DEV_TO_UNIT(dev)	(MINOR_TO_UNIT(minor(dev)))
 #define	MINOR_MAGIC_MASK	(CALLOUT_MASK | CONTROL_MASK)
 #define	MINOR_TO_UNIT(mynor)	((mynor) & ~MINOR_MAGIC_MASK)
+#define	BASIC_BAUD_MAX		115200
 
 #ifdef COM_MULTIPORT
 /* checks in flags for multiport and which is multiport "master chip"
@@ -200,7 +201,7 @@ struct com_s {
 	int	unit;		/* unit	number */
 	int	dtr_wait;	/* time to hold DTR down on close (* 1/hz) */
 	u_int	tx_fifo_size;
-	u_int	baud_multiple;	/* chip has been supercharged by multiple X */
+	u_int	baud_max;	/* maximum baud rate, (divisor = 1) */
 	u_int	wopeners;	/* # processes waiting for DCD in open() */
 
 	/*
@@ -338,7 +339,7 @@ static struct cdevsw sio_cdevsw = {
 
 static	int	comconsole = -1;
 static	Port_t	siocniobase;
-	int	siocn_baud_multiple = 1; /* set from vendor startup code */
+	int	siocn_baud_max = BASIC_BAUD_MAX ; /* set from vendor code */
 static	speed_t	comdefaultrate = CONSPEED;
 static	u_int	com_events;	/* input chars + weighted output completions */
 static	int	sio_timeout;
@@ -869,9 +870,9 @@ sioattach(isdp)
 		com->lt_out.c_ispeed = com->lt_out.c_ospeed =
 		com->lt_in.c_ispeed = com->lt_in.c_ospeed = 0;
 		com->it_in.c_ispeed = com->it_in.c_ospeed = comdefaultrate;
-		com->baud_multiple = siocn_baud_multiple;
+		com->baud_max = siocn_baud_max;
 	} else {
-		com->baud_multiple = COM_BAUD_MULTIPLE(isdp);
+		com->baud_max = COM_BAUD_MULTIPLE(isdp) * BASIC_BAUD_MAX;
 		com->it_in.c_ispeed = com->it_in.c_ospeed = TTYDEF_SPEED;
 	}
 	termioschars(&com->it_in);
@@ -1939,7 +1940,7 @@ repeat:
  * Probably needs less magic numbers.
  */
 static int
-makedivisor( speed_t *speed, int *divisorp, int baud_multiple)
+makedivisor( speed_t *speed, int *divisorp, int baud_max)
 {
 	int check, divisor;
 
@@ -1952,7 +1953,7 @@ makedivisor( speed_t *speed, int *divisorp, int baud_multiple)
 		 * a direct truncation, after all, the correct
 		 * divisor might be 0.001 higher.
 		 */
-		divisor = (baud_multiple * 115200 * 2) / (*speed);
+		divisor = (baud_max * 2) / (*speed);
 
 		divisor = (divisor + 1) >> 1; /* round up or down */
 		/*
@@ -1960,8 +1961,7 @@ makedivisor( speed_t *speed, int *divisorp, int baud_multiple)
 		 * must be (+ or -) 5%
 		 * to be acceptable. We'll use 4%.
 		 */
-		check = (100 * divisor * (*speed))
-			/(baud_multiple * 115200);
+		check = (100 * divisor * (*speed)) /(baud_max);
 		if ((check < 96) || (check > 104)) {
 			return (EINVAL); /* not close enough */
 		}
@@ -1970,7 +1970,7 @@ makedivisor( speed_t *speed, int *divisorp, int baud_multiple)
 		 * Make the reported speed show what we
 		 * are actually doing.
 		 */
-		*speed = (baud_multiple * 115200)/divisor;
+		*speed = (baud_max)/divisor;
 	}
 	*divisorp = divisor;
 	return (0);
@@ -2002,15 +2002,15 @@ comparam(tp, t)
 		t->c_ispeed = t->c_ospeed;
 
 	/* check requested parameters */
-	if(com->baud_multiple == 0) { /* catch 0 as well */
-		com->baud_multiple = 1;
+	if(com->baud_max == 0) { /* catch 0 as well */
+		com->baud_max = BASIC_BAUD_MAX;
 		printf("sio%d: warning, baud multiple was 0\n", unit); 
 	}
-	error = makedivisor( &(t->c_ospeed), &divisor , com->baud_multiple);
+	error = makedivisor( &(t->c_ospeed), &divisor , com->baud_max);
 	if (error)
 		return error;
 	t->c_ispeed = t->c_ospeed;
-	if (divisor < 0 || divisor > 0 && t->c_ispeed != t->c_ospeed) {
+	if (divisor <= 0) {
 		return (EINVAL);
 	}
 
@@ -2560,7 +2560,7 @@ siocnopen(sp)
 	 * data input register.  This also reduces the effects of the
 	 * UMC8669F bug.
 	 */
-	makedivisor( &comdefaultrate, &divisor , siocn_baud_multiple);
+	makedivisor( &comdefaultrate, &divisor , siocn_baud_max);
 	dlbl = divisor & 0xFF;
 	if (sp->dlbl != dlbl)
 		outb(iobase + com_dlbl, dlbl);
@@ -2629,7 +2629,8 @@ siocnprobe(cp)
 		&& (dvp->id_enabled)
 		&& (COM_CONSOLE(dvp))) {
 			siocniobase = dvp->id_iobase;
-			siocn_baud_multiple = COM_BAUD_MULTIPLE(dvp);
+			siocn_baud_max
+				= COM_BAUD_MULTIPLE(dvp) * BASIC_BAUD_MAX;
 			s = spltty();
 			siocnopen(&sp);
 			splx(s);
