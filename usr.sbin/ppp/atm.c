@@ -129,6 +129,7 @@ static const struct device baseatmdevice = {
   NULL,
   NULL,
   NULL,
+  NULL,
   atm_Free,
   atm_Recvfrom,
   atm_Sendto,

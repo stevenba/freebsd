@@ -288,6 +288,7 @@ static const struct device baseetherdevice = {
   NULL,
   NULL,
   NULL,
+  NULL,
   ether_Free,
   ether_Read,
   ether_Write,
@@ -543,7 +544,7 @@ ether_Create(struct physical *p)
     if (f == ninfo->hooks) {
       /*
        * Create a new ``PPPoE'' node connected to the ``ether'' node using
-       * the magic ``orphan'' and ``ethernet'' hooks
+       * the ``orphan'' and ``ethernet'' hooks
        */
       snprintf(mkp.type, sizeof mkp.type, "%s", NG_PPPOE_NODE_TYPE);
       snprintf(mkp.ourhook, sizeof mkp.ourhook, "%s", NG_ETHER_HOOK_ORPHAN);
