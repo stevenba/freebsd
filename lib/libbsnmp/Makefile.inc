@@ -1,6 +1,0 @@
-# $FreeBSD$
-
-SHLIB_MAJOR=	1
-WARNS?=		6
-NO_WERROR=	yes
-INCSDIR=	${INCLUDEDIR}/bsnmp
