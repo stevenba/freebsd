@@ -1,4 +1,0 @@
-# $FreeBSD$
-
-rm doc/*.dvi doc/*.html doc/*.ps doc/*.0 doc/*.info doc/*.tex doc/texi2*
-rm savestring.c
