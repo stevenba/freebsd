@@ -120,16 +120,23 @@ struct {
   int (*DeviceSize)(void);
 } devices[] = {
 #ifndef NOI4B
+  /*
+   * This must come before ``tty'' so that the probe routine is
+   * able to identify it as a more specific type of terminal device.
+   */
   { i4b_Create, i4b_iov2device, i4b_DeviceSize },
 #endif
   { tty_Create, tty_iov2device, tty_DeviceSize },
 #ifndef NONETGRAPH
-  /* These must come before ``udp'' & ``tcp'' */
+  /*
+   * This must come before ``udp'' so that the probe routine is
+   * able to identify it as a more specific type of SOCK_DGRAM.
+   */
   { ether_Create, ether_iov2device, ether_DeviceSize },
   { ng_Create, ng_iov2device, ng_DeviceSize },
 #endif
 #ifndef NOATM
-  /* and so must this */
+  /* Ditto for ATM devices */
   { atm_Create, atm_iov2device, atm_DeviceSize },
 #endif
   { tcp_Create, tcp_iov2device, tcp_DeviceSize },
