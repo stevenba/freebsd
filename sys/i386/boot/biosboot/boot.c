@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, [92/04/03  16:51:14  rvb]
- *	$Id: boot.c,v 1.55 1996/08/28 18:29:51 ache Exp $
+ *	$Id: boot.c,v 1.56.2.1 1996/09/05 21:23:23 julian Exp $
  */
 
 
@@ -63,10 +63,8 @@ WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #ifdef NAMEBLOCK
 char *dflt_name ;
-/*char *dflt_name = (char *)0x0000ffb0; */ /* force it to not be in the BSS */
 #endif
 char namebuf[NAMEBUF_LEN];
-struct exec head;
 struct bootinfo bootinfo;
 int loadflags;
 
@@ -133,15 +131,24 @@ boot(int drive)
 	}
 #ifdef	NAMEBLOCK
 	/*
-	 * this is set by the code in boot2.S
+	 * dflt_name is set by the code in boot.S via boot2.S
 	 */
 	if( (*dflt_name++ == 'D') && (*dflt_name++ == 'N')) {
-		strcpy(namebuf,dflt_name);
+		name = dflt_name;
 	} else
 #endif	/*NAMEBLOCK*/
 loadstart:
-	strcpy(namebuf,dflname);/* re-initialize in case of loop */
-	name = dflname; /* XXX check if needed */
+	name = dflname;
+#if 1
+	{
+		char *a = name;
+		char *b = namebuf;
+
+		while (*b++ = *a++);
+	}
+#else
+	bcopy(name,namebuf,64);
+#endif
 	/* print this all each time.. (saves space to do so) */
 	/* If we have looped, use the previous entries as defaults */
 	printf("\n>> FreeBSD BOOT @ 0x%x: %d/%d k of memory\n"
@@ -197,6 +204,7 @@ loadstart:
 						*howto ^= RB_SERIAL;
 						if (*howto & RB_SERIAL)
 							init_serial();
+						continue;
 					}
 					if (*ptr == 'g')
 						*howto |= RB_GDB;
@@ -243,6 +251,7 @@ loadprog(void)
 	long int startaddr;
 	long int addr;	/* physical address.. not directly useable */
 	long int bootdev;
+	struct exec head;
 	int i;
 	unsigned pad;
 
