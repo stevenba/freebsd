@@ -21,7 +21,7 @@ build-tools: fini
 
 #  The use of ``proj+%BT.o'' is to get around bogus dependacy information
 #  created for build-tools sources.
-fini: fini.o proj+%BT.o
+fini: fini.o proj+%BT.o # ${GCCDIR}/safe-ctype.c
 	${CC} -static ${CFLAGS} ${LDFLAGS} -o ${.TARGET} ${.ALLSRC}
 
 proj+%BT.o: proj.c
