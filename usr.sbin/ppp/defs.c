@@ -398,6 +398,23 @@ zerofdset(fd_set *s)
 }
 
 void
+Concatinate(char *buf, size_t sz, int argc, const char *const *argv)
+{
+  int i, n, pos;
+
+  *buf = '\0';
+  for (pos = i = 0; i < argc; i++) {
+    n = snprintf(buf + pos, sz - pos, "%s%s", i ? " " : "", argv[i]);
+    if (n < 0) {
+      buf[pos] = '\0';
+      break;
+    }
+    if ((pos += n) >= sz)
+      break;
+  }
+}
+
+void
 loadmodules(int how, const char *module, ...)
 {
 #if defined(__FreeBSD__) && !defined(NOKLDLOAD)
