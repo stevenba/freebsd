@@ -2,10 +2,9 @@
 
 .include "../Makefile.inc"
 
-.PATH: ${GCCDIR}
+.PATH: ${GCCDIR} ${GCCDIR}/doc
 
 PROG=	gcov
 SRCS=	gcov.c
-NOMAN=	1
 
 .include <bsd.prog.mk>
