@@ -1,9 +1,0 @@
-#!/bin/sh
-# $Id: login.en,v 1.1.1.1 1998/08/27 17:38:42 abial Exp $
-
-if [ "$2" != "root" ]
-then
-	exit
-fi
-cat /etc/motd
-HOME=/root exec -sh
