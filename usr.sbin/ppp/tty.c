@@ -101,7 +101,7 @@ struct ttydevice {
     int disc;			/* Old line-discipline */
   } real;
   char hook[sizeof NG_ASYNC_HOOK_SYNC]; /* our ng_socket hook */
-  int ctrl;			/* A netgraph control socket (maybe) */
+  int cs;			/* A netgraph control socket (maybe) */
 #endif
   struct termios ios;		/* To be able to reset from raw mode */
 };
@@ -245,7 +245,7 @@ tty_SetAsyncParams(struct physical *p, u_int32_t mymap, u_int32_t hismap)
     cfg.amru = MAX_MTU;
     cfg.smru = MAX_MRU;
     log_Printf(LogDEBUG, "Configure async node at %s\n", asyncpath);
-    if (NgSendMsg(dev->ctrl, asyncpath, NGM_ASYNC_COOKIE,
+    if (NgSendMsg(dev->cs, asyncpath, NGM_ASYNC_COOKIE,
                   NGM_ASYNC_CMD_SET_CONFIG, &cfg, sizeof cfg) < 0)
       log_Printf(LogWARN, "%s: Can't configure async node at %s\n",
                  p->link.name, asyncpath);
@@ -358,7 +358,7 @@ LoadLineDiscipline(struct physical *p)
 
   /* All done, set up our device state */
   snprintf(dev->hook, sizeof dev->hook, "%s", ngc.ourhook);
-  dev->ctrl = cs;
+  dev->cs = cs;
   dev->real.fd = p->fd;
   p->fd = ds;
   dev->real.speed = speed;
@@ -392,8 +392,8 @@ log_Printf(LogPHASE, "back to speed %d\n", dev->real.speed);
     close(p->fd);
     p->fd = dev->real.fd;
     dev->real.fd = -1;
-    close(dev->ctrl);
-    dev->ctrl = -1;
+    close(dev->cs);
+    dev->cs = -1;
     *dev->hook = '\0';
     if (ID0ioctl(p->fd, TIOCSETD, &dev->real.disc) == 0) {
       physical_SetupStack(p, dev->dev.name, PHYSICAL_NOFORCE);
@@ -570,6 +570,11 @@ tty_device2iov(struct device *d, struct iovec *iov, int *niov,
   iov[*niov].iov_len = sz;
   (*niov)++;
 
+  if (dev->cs >= 0) {
+    *auxfd = dev->cs;
+    (*nauxfd)++;
+  }
+
   if (dev->Timer.state != TIMER_STOPPED) {
     timer_Stop(&dev->Timer);
     dev->Timer.state = TIMER_RUNNING;
@@ -608,6 +613,12 @@ tty_iov2device(int type, struct physical *p, struct iovec *iov, int *niov,
                  (int)(sizeof *dev));
       AbortProgram(EX_OSERR);
     }
+
+    if (*nauxfd) {
+      dev->cs = *auxfd;
+      (*nauxfd)--;
+    } else
+      dev->cs = -1;
 
     /* Refresh function pointers etc */
     memcpy(&dev->dev, &basettydevice, sizeof dev->dev);
