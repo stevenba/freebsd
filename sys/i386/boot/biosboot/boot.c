@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, [92/04/03  16:51:14  rvb]
- *	$Id: boot.c,v 1.56.2.1 1996/09/05 21:23:23 julian Exp $
+ *	$Id: boot.c,v 1.55 1996/08/28 18:29:51 ache Exp $
  */
 
 
@@ -176,43 +176,44 @@ loadstart:
 	 	* (or was read from the default string)
 	 	*/
 		while (*ptr != '\0') {
+			char c;
 			/*
 			 * pass any leading (or inter-arg) spaces
 			 */
-			if (*ptr == ' ') {
+			if ((c = *ptr) == ' ') {
 				ptr++;
 				continue;
 			}
 				/*
 			 * If it's an arg, take as many letters as we can
 			 */
-			if (*ptr == '-') {
-				while (( *++ptr) != '\0') {
-					if (*ptr == ' ')
+			if (c == '-') {
+				while ((c =  *++ptr) != '\0') {
+					if (c == ' ')
 						break;
-					if (*ptr == 'C')
+					if (c == 'C')
 						*howto |= RB_CDROM;
-					if (*ptr == 'a')
+					if (c == 'a')
 						*howto |= RB_ASKNAME;
-					if (*ptr == 'b')
+					if (c == 'b')
 						*howto |= RB_HALT;
-					if (*ptr == 'c')
+					if (c == 'c')
 						*howto |= RB_CONFIG;
-					if (*ptr == 'd')
+					if (c == 'd')
 						*howto |= RB_KDB;
-					if (*ptr == 'h') {
+					if (c == 'h') {
 						*howto ^= RB_SERIAL;
 						if (*howto & RB_SERIAL)
 							init_serial();
 						continue;
 					}
-					if (*ptr == 'g')
+					if (c == 'g')
 						*howto |= RB_GDB;
-					if (*ptr == 'r')
+					if (c == 'r')
 						*howto |= RB_DFLTROOT;
-					if (*ptr == 's')
+					if (c == 's')
 						*howto |= RB_SINGLE;
-					if (*ptr == 'v')
+					if (c == 'v')
 						*howto |= RB_VERBOSE;
 				}
 			} else {
