@@ -635,7 +635,7 @@ ng_Create(struct physical *p)
 
       /* Get our list back */
       resp = (struct ng_mesg *)rbuf;
-      if (NgRecvMsg(dev->cs, resp, sizeof rbuf, NULL) < 0) {
+      if (NgRecvMsg(dev->cs, resp, sizeof rbuf, NULL) <= 0) {
         log_Printf(LogWARN, "%s: Cannot get netgraph response: %s\n",
                    p->link.name, strerror(errno));
         return ng_Abandon(dev, p);
