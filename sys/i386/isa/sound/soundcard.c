@@ -4,398 +4,601 @@
  * Soundcard driver for 386BSD.
  * 
  * Copyright by Hannu Savolainen 1993
- *
+ * 
  * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * modification, are permitted provided that the following conditions are
+ * met: 1. Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer. 2.
+ * Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
+ * 
  */
 
-#include "sound_config.h"
+#include <i386/isa/sound/sound_config.h>
 
-#ifdef CONFIGURE_SOUNDCARD
+#if NSND > 0	/* from "snd.h" */
+#include <vm/vm.h>
+#include <vm/vm_kern.h>
+#include <vm/vm_param.h>
+#include <vm/pmap.h>
+#include <vm/vm_extern.h>
+#include <sys/mman.h>
 
-#include "dev_table.h"
+#include <i386/isa/sound/dev_table.h>
+#include <i386/isa/isa_device.h>
+#include <i386/isa/isa.h>
 
-u_int	snd1mask;
-u_int	snd2mask;
-u_int	snd3mask;
-u_int	snd4mask;
-u_int	snd5mask;
-u_int	snd6mask;
-u_int	snd7mask;
-u_int	snd8mask;
-u_int	snd9mask;
+
+/*
+**  Register definitions for DMA controller 1 (channels 0..3):
+*/
+#define	DMA1_CHN(c)	(IO_DMA1 + 1*(2*(c)))	/* addr reg for channel c */
+#define	DMA1_SMSK	(IO_DMA1 + 1*10)	/* single mask register */
+#define	DMA1_MODE	(IO_DMA1 + 1*11)	/* mode register */
+#define	DMA1_FFC	(IO_DMA1 + 1*12)	/* clear first/last FF */
+
+/*
+**  Register definitions for DMA controller 2 (channels 4..7):
+*/
+#define	DMA2_CHN(c)	(IO_DMA2 + 2*(2*(c)))	/* addr reg for channel c */
+#define	DMA2_SMSK	(IO_DMA2 + 2*10)	/* single mask register */
+#define	DMA2_MODE	(IO_DMA2 + 2*11)	/* mode register */
+#define	DMA2_FFC	(IO_DMA2 + 2*12)	/* clear first/last FF */
+
 
 #define FIX_RETURN(ret) {if ((ret)<0) return -(ret); else return 0;}
 
-static int      timer_running = 0;
-
-static int      soundcards_installed = 0;	/* Number of installed
-						 * soundcards */
+static int      soundcards_installed = 0; /* Number of installed soundcards */
 static int      soundcard_configured = 0;
 
 static struct fileinfo files[SND_NDEVS];
+struct selinfo  selinfo[SND_NDEVS >> 4];
 
-int             sndprobe (struct isa_device *dev);
-int             sndattach (struct isa_device *dev);
-int             sndopen (dev_t dev, int flags);
-int             sndclose (dev_t dev, int flags);
-int             sndioctl (dev_t dev, int cmd, caddr_t arg, int mode);
-int             sndread (int dev, struct uio *uio);
-int             sndwrite (int dev, struct uio *uio);
-int             sndselect (int dev, int rw);
-static void	sound_mem_init(void);
+int
+MIDIbuf_poll (int dev, struct fileinfo *file, int events, select_table * wait);
 
-unsigned long
+int
+audio_poll(int dev, struct fileinfo * file, int events, select_table * wait);
+
+int
+sequencer_poll (int dev, struct fileinfo *file, int events, select_table * wait);
+
+void sndintr    __P((int unit));
+int sndprobe    __P((struct isa_device *));
+int sndattach   __P((struct isa_device *));
+int sndmmap   __P((dev_t dev, int offset, int nprot ));
+
+static d_open_t sndopen;
+static d_close_t sndclose;
+static d_ioctl_t sndioctl;
+static d_read_t sndread;
+static d_write_t sndwrite;
+static d_poll_t sndpoll;
+
+static char     driver_name[] = "snd";
+
+#define CDEV_MAJOR 30
+static struct cdevsw snd_cdevsw = {
+	sndopen, sndclose, sndread, sndwrite,
+	sndioctl, nxstop, nxreset, nxdevtotty,
+	sndpoll, sndmmap, nxstrategy, driver_name,
+	NULL, -1,
+};
+
+
+
+
+static void     sound_mem_init(void);
+
+/*
+ * for each "device XXX" entry in the config file, we have
+ * a struct isa_driver which is linked into isa_devtab_null[]
+ *
+ * XXX It is a bit stupid to call the generic routine so many times and
+ * switch then to the specific one, but the alternative way would be
+ * to replicate some code in the probe/attach routines.
+ */
+
+struct isa_driver opldriver = {sndprobe, sndattach, "opl"};
+struct isa_driver trixdriver = {sndprobe, sndattach, "trix"};
+struct isa_driver trixsbdriver = {sndprobe, sndattach, "trixsb"};
+struct isa_driver sbdriver = {sndprobe, sndattach, "sb"};
+struct isa_driver sbxvidriver = {sndprobe, sndattach, "sbxvi"};
+struct isa_driver sbmididriver = {sndprobe, sndattach, "sbmidi"};
+struct isa_driver awedriver    = {sndprobe, sndattach, "awe"};
+struct isa_driver pasdriver = {sndprobe, sndattach, "pas"};
+struct isa_driver mpudriver = {sndprobe, sndattach, "mpu"};
+struct isa_driver gusdriver = {sndprobe, sndattach, "gus"};
+struct isa_driver gusxvidriver = {sndprobe, sndattach, "gusxvi"};
+struct isa_driver gusmaxdriver = {sndprobe, sndattach, "gusmax"};
+struct isa_driver uartdriver = {sndprobe, sndattach, "uart"};
+struct isa_driver mssdriver = {sndprobe, sndattach, "mss"};
+struct isa_driver sscapedriver = {sndprobe, sndattach, "sscape"};
+struct isa_driver sscape_mssdriver = {sndprobe, sndattach, "sscape_mss"};
+
+short ipri_to_irq(u_short ipri);
+
+u_long
 get_time(void)
 {
-  extern struct timeval time;
-  struct timeval timecopy;
-  int x;
-  
-  x = splclock();
-  timecopy = time;
-  splx(x);
-  return timecopy.tv_usec/(1000000/HZ) +
-	  (unsigned long)timecopy.tv_sec*HZ;
+    struct timeval  timecopy;
+    int             x;
+
+    x = splclock();
+    timecopy = time;
+    splx(x);
+    return timecopy.tv_usec / (1000000 / hz) +
+		(u_long) timecopy.tv_sec * hz;
 }
 
 int
-sndread (int dev, struct uio *buf)
+sndmmap( dev_t dev, int offset, int nprot )
 {
-  int             count = buf->uio_resid;
+	int		unit;
+	struct dma_buffparms * dmap;
 
-  dev = minor (dev);
+	dev = minor(dev) >> 4;
+	if (dev > 0 ) return (-1);
 
-  FIX_RETURN (sound_read_sw (dev, &files[dev], buf, count));
+	dmap =	audio_devs[dev]->dmap_out;
+
+	if (nprot & PROT_EXEC)
+		return( -1 );
+	dmap->mapping_flags |= DMA_MAP_MAPPED ;
+	return( i386_btop(vtophys(dmap->raw_buf) + offset) );
+}
+
+
+static int
+sndread(dev_t dev, struct uio * buf, int flag)
+{
+    int             count = buf->uio_resid;
+
+    dev = minor(dev);
+    FIX_RETURN(sound_read_sw(dev, &files[dev], buf, count));
+}
+
+
+static int
+sndwrite(dev_t dev, struct uio * buf, int flag)
+{
+    int             count = buf->uio_resid;
+
+    dev = minor(dev);
+    FIX_RETURN(sound_write_sw(dev, &files[dev], buf, count));
+}
+
+static int
+sndopen(dev_t dev, int flags, int mode, struct proc * p)
+{
+    int             retval;
+    struct fileinfo tmp_file;
+
+    dev = minor(dev);
+    if (!soundcard_configured && dev) {
+	printf("SoundCard Error: soundcard system has not been configured\n");
+	return ENODEV ;
+    }
+    tmp_file.mode = 0;
+
+    if (flags & FREAD && flags & FWRITE)
+	tmp_file.mode = OPEN_READWRITE;
+    else if (flags & FREAD)
+	tmp_file.mode = OPEN_READ;
+    else if (flags & FWRITE)
+	tmp_file.mode = OPEN_WRITE;
+
+    selinfo[dev >> 4].si_pid = 0;
+    selinfo[dev >> 4].si_flags = 0;
+    if ((retval = sound_open_sw(dev, &tmp_file)) < 0)
+	FIX_RETURN(retval);
+
+    bcopy((char *) &tmp_file, (char *) &files[dev], sizeof(tmp_file));
+
+    FIX_RETURN(retval);
+}
+
+
+static int
+sndclose(dev_t dev, int flags, int mode, struct proc * p)
+{
+    dev = minor(dev);
+    sound_release_sw(dev, &files[dev]);
+
+    return 0 ;
+}
+
+static int
+sndioctl(dev_t dev, int cmd, caddr_t arg, int mode, struct proc * p)
+{
+    dev = minor(dev);
+    FIX_RETURN(sound_ioctl_sw(dev, &files[dev], cmd, arg));
 }
 
 int
-sndwrite (int dev, struct uio *buf)
+sndpoll(dev_t dev, int events, struct proc * p)
 {
-  int             count = buf->uio_resid;
+    dev = minor(dev);
+    dev = minor(dev);
 
-  dev = minor (dev);
+    /* printf ("snd_select(dev=%d, rw=%d, pid=%d)\n", dev, rw, p->p_pid); */
+#ifdef ALLOW_POLL
+    switch (dev & 0x0f) {
+#ifdef CONFIG_SEQUENCER
+    case SND_DEV_SEQ:
+    case SND_DEV_SEQ2:
+	return sequencer_poll(dev, &files[dev], events, p);
+	break;
+#endif
 
-  FIX_RETURN (sound_write_sw (dev, &files[dev], buf, count));
-}
+#ifdef CONFIG_MIDI
+    case SND_DEV_MIDIN:
+	return MIDIbuf_poll(dev, &files[dev], events, p);
+	break;
+#endif
 
-int
-sndopen (dev_t dev, int flags)
-{
-  int             retval;
+#ifdef CONFIG_AUDIO
+    case SND_DEV_DSP:
+    case SND_DEV_DSP16:
+    case SND_DEV_AUDIO:
 
-  dev = minor (dev);
+	return audio_poll(dev, &files[dev], events, p);
+	break;
+#endif
 
-  if (!soundcard_configured && dev)
-    {
-      printk ("SoundCard Error: The soundcard system has not been configured\n");
-      FIX_RETURN (-ENODEV);
+    default:
+	return 0;
     }
 
-  files[dev].mode = 0;
+#endif	/* ALLOW_POLL */
+    DEB(printf("sound_ioctl(dev=%d, cmd=0x%x, arg=0x%x)\n", dev, cmd, arg));
 
-  if (flags & FREAD && flags & FWRITE)
-    files[dev].mode = OPEN_READWRITE;
-  else if (flags & FREAD)
-    files[dev].mode = OPEN_READ;
-  else if (flags & FWRITE)
-    files[dev].mode = OPEN_WRITE;
+    return 0 ;
+}
 
-  FIX_RETURN(sound_open_sw (dev, &files[dev]));
+/* XXX this should become ffs(ipri), perhaps -1 lr 970705 */
+short
+ipri_to_irq(u_short ipri)
+{
+    /*
+     * Converts the ipri (bitmask) to the corresponding irq number
+     */
+    int             irq;
+
+    for (irq = 0; irq < 16; irq++)
+	if (ipri == (1 << irq))
+	    return irq;
+
+    return -1;		/* Invalid argument */
+}
+
+static int
+driver_to_voxunit(struct isa_driver * driver)
+{
+    /*
+     * converts a sound driver pointer into the equivalent VoxWare device
+     * unit number
+     */
+    if (driver == &opldriver)
+	return (SNDCARD_ADLIB);
+    else if (driver == &sbdriver)
+	return (SNDCARD_SB);
+    else if (driver == &pasdriver)
+	return (SNDCARD_PAS);
+    else if (driver == &gusdriver)
+	return (SNDCARD_GUS);
+    else if (driver == &mpudriver)
+	return (SNDCARD_MPU401);
+    else if (driver == &sbxvidriver)
+	return (SNDCARD_SB16);
+    else if (driver == &sbmididriver)
+	return (SNDCARD_SB16MIDI);
+    else if(driver == &awedriver)
+	return(SNDCARD_AWE32);
+    else if (driver == &uartdriver)
+	return (SNDCARD_UART6850);
+    else if (driver == &gusdriver)
+	return (SNDCARD_GUS16);
+    else if (driver == &mssdriver)
+	return (SNDCARD_MSS);
+    else if (driver == &sscapedriver)
+	return(SNDCARD_SSCAPE);
+    else if (driver == &sscape_mssdriver)
+	return(SNDCARD_SSCAPE_MSS);
+    else if (driver == &trixdriver)
+	return (SNDCARD_TRXPRO);
+    else if (driver == &trixsbdriver)
+	return (SNDCARD_TRXPRO_SB);
+    else
+	return (0);
+}
+
+/*
+ * very dirty: tmp_osp is allocated in sndprobe, and used at the next
+ * call in sndattach
+ */
+
+static sound_os_info *temp_osp;
+
+/*
+ * sndprobe is called for each isa_device. From here, a voxware unit
+ * number is determined, and the appropriate probe routine is selected.
+ * The parameters from the config line are passed to the hw_config struct.
+ */
+
+int
+sndprobe(struct isa_device * dev)
+{
+    struct address_info hw_config;
+    int             unit;
+
+    temp_osp = (sound_os_info *)malloc(sizeof(sound_os_info),
+	    M_DEVBUF, M_NOWAIT);
+    if (!temp_osp)
+	panic("SOUND: Cannot allocate memory\n");
+
+    /*
+     * get config info from the kernel config. These may be overridden
+     * by the local autoconfiguration routines though (e.g. pnp stuff).
+     */
+
+    hw_config.io_base = dev->id_iobase;
+    hw_config.irq = ipri_to_irq(dev->id_irq);
+    hw_config.dma = dev->id_drq;
+
+    /*
+     * misuse the flags field for read dma. Note that, to use 0 as
+     * read dma channel, one of the high bits should be set.  lr970705 XXX
+     */
+
+    if (dev->id_flags != 0)
+	hw_config.dma2 = dev->id_flags & 0x7;
+    else
+	hw_config.dma2 = -1;
+
+    hw_config.always_detect = 0;
+    hw_config.name = NULL;
+    hw_config.card_subtype = 0;
+
+    temp_osp->unit = dev->id_unit;
+    hw_config.osp = temp_osp;
+    unit = driver_to_voxunit(dev->id_driver);
+
+    if (sndtable_probe(unit, &hw_config)) {
+	dev->id_iobase = hw_config.io_base;
+	dev->id_irq =  hw_config.irq == -1 ? 0 : (1 << hw_config.irq);
+	dev->id_drq = hw_config.dma;
+
+	if (hw_config.dma != hw_config.dma2 && ( hw_config.dma2 != -1))
+	    dev->id_flags = hw_config.dma2 | 0x100; /* XXX lr */
+	else
+	    dev->id_flags = 0;
+	return TRUE;
+    }
+    return 0;
 }
 
 int
-sndclose (dev_t dev, int flags)
+sndattach(struct isa_device * dev)
 {
+    int             unit;
+    static int      midi_initialized = 0;
+    static int      seq_initialized = 0;
+    struct address_info hw_config;
 
-  dev = minor (dev);
+    unit = driver_to_voxunit(dev->id_driver);
+    hw_config.io_base = dev->id_iobase;
+    hw_config.irq = ipri_to_irq(dev->id_irq);
+    hw_config.dma = dev->id_drq;
 
-  sound_release_sw(dev, &files[dev]);
-  FIX_RETURN (0);
-}
+    /* misuse the flags field for read dma */
+    if (dev->id_flags != 0)
+	hw_config.dma2 = dev->id_flags & 0x7;
+    else
+	hw_config.dma2 = -1;
 
-int
-sndioctl (dev_t dev, int cmd, caddr_t arg, int mode)
-{
-  dev = minor (dev);
+    hw_config.card_subtype = 0;
+    hw_config.osp = temp_osp;
 
-  FIX_RETURN (sound_ioctl_sw (dev, &files[dev], cmd, (unsigned int) arg));
-}
-
-int
-sndselect (int dev, int rw)
-{
-  dev = minor (dev);
-
-  DEB (printk ("sound_ioctl(dev=%d, cmd=0x%x, arg=0x%x)\n", dev, cmd, arg));
-
-  FIX_RETURN (0);
-}
-
-static short
-ipri_to_irq (unsigned short ipri)
-{
-  /*
-   * Converts the ipri (bitmask) to the corresponding irq number
-   */
-  int             irq;
-
-  for (irq = 0; irq < 16; irq++)
-    if (ipri == (1 << irq))
-      return irq;
-
-  return -1;			/* Invalid argument */
-}
-
-int
-sndprobe (struct isa_device *dev)
-{
-  struct address_info hw_config;
-
-  hw_config.io_base = dev->id_iobase;
-  hw_config.irq = ipri_to_irq (dev->id_irq);
-  hw_config.dma = dev->id_drq;
-  
-  return sndtable_probe (dev->id_unit, &hw_config);
-}
-
-int
-sndattach (struct isa_device *dev)
-{
-  int             i;
-  static int      midi_initialized = 0;
-  static int      seq_initialized = 0;
-  static int 	  generic_midi_initialized = 0; 
-  unsigned long	  mem_start = 0xefffffff;
-  struct address_info hw_config;
-
-  hw_config.io_base = dev->id_iobase;
-  hw_config.irq = ipri_to_irq (dev->id_irq);
-  hw_config.dma = dev->id_drq;
-
-  if (dev->id_unit)		/* Card init */
-    if (!sndtable_init_card (dev->id_unit, &hw_config))
-      {
-	printf (" <Driver not configured>");
+    if (!unit)
 	return FALSE;
-      }
 
-  /*
-   * Init the high level sound driver
-   */
-
-  if (!(soundcards_installed = sndtable_get_cardcount ()))
-    {
-      printf (" <No such hardware>");
-      return FALSE;		/* No cards detected */
+    if (!(sndtable_init_card(unit, &hw_config))) {	/* init card */
+	printf(" <Driver not configured>");
+	return FALSE;
     }
+    /*
+     * Init the high level sound driver
+     */
 
-  printf("\n");
-
-#ifndef EXCLUDE_AUDIO
-  if (num_audiodevs)	/* Audio devices present */
-    {
-      mem_start = DMAbuf_init (mem_start);
-      mem_start = audio_init (mem_start);
-      sound_mem_init ();
+    if (!(soundcards_installed = sndtable_get_cardcount())) {
+	DDB(printf("No drivers actually installed\n"));
+	return FALSE;	/* No cards detected */
     }
+    printf("\n");
 
-  soundcard_configured = 1;
+#ifdef CONFIG_AUDIO
+    if (num_audiodevs) {	/* Audio devices present */
+	DMAbuf_init();
+	sound_mem_init();
+    }
+    soundcard_configured = 1;
 #endif
 
-  if (num_midis && !midi_initialized)
-    {
-      midi_initialized = 1;
-      mem_start = MIDIbuf_init (mem_start);
+    if (num_midis && !midi_initialized)
+	midi_initialized = 1;
+
+    if ((num_midis + num_synths) && !seq_initialized) {
+	seq_initialized = 1;
+	sequencer_init();
     }
 
-  if ((num_midis + num_synths) && !seq_initialized)
     {
-      seq_initialized = 1;
-      mem_start = sequencer_init (mem_start);
+	dev_t           dev;
+
+	dev = makedev(CDEV_MAJOR, 0);
+	cdevsw_add(&dev, &snd_cdevsw, NULL);
     }
 
-  return TRUE;
+
+    return TRUE;
 }
 
-void
-tenmicrosec (void)
-{
-  int             i;
 
-  for (i = 0; i < 16; i++)
-    inb (0x80);
-}
+#ifdef CONFIG_AUDIO
 
-void
-request_sound_timer (int count)
-{
-  static int      current = 0;
-  int             tmp = count;
-
-  if (count < 0)
-    timeout (sequencer_timer, 0, -count);
-  else
-    {
-
-      if (count < current)
-	current = 0;		/* Timer restarted */
-
-      count = count - current;
-
-      current = tmp;
-
-      if (!count)
-	count = 1;
-
-      timeout (sequencer_timer, 0, count);
-    }
-  timer_running = 1;
-}
-
-void
-sound_stop_timer (void)
-{
-  if (timer_running)
-    untimeout (sequencer_timer, 0);
-  timer_running = 0;
-}
-
-#ifndef EXCLUDE_AUDIO
 static void
-sound_mem_init (void)
+alloc_dmap(int dev, int chan, struct dma_buffparms * dmap)
 {
-  int             i, dev;
-  unsigned long   dma_pagesize;
-  static unsigned long dsp_init_mask = 0;
+    char           *tmpbuf;
+    int            i;
 
-  for (dev = 0; dev < num_audiodevs; dev++)	/* Enumerate devices */
-    if (!(dsp_init_mask & (1 << dev)))	/* Not already done */
-      if (sound_buffcounts[dev] > 0 && sound_dsp_dmachan[dev] > 0)
-	{
-	  dsp_init_mask |= (1 << dev);
+    tmpbuf = contigmalloc(audio_devs[dev]->buffsize, M_DEVBUF, M_NOWAIT,
+		0ul, 0xfffffful, 1ul, chan & 4 ? 0x20000ul : 0x10000ul);
+    if (tmpbuf == NULL)
+	printf("soundcard buffer alloc failed \n");
 
-	  if (sound_dma_automode[dev])
-	    {
-	      sound_dma_automode[dev] = 0;	/* Not possible with 386BSD */
-	    }
+    if (tmpbuf == NULL) {
+	printf("snd: Unable to allocate %d bytes of buffer\n",
+	       2 * (int) audio_devs[dev]->buffsize);
+	return;
+    }
+    dmap->raw_buf = tmpbuf;
+    /*
+     * Use virtual address as the physical address, since isa_dmastart
+     * performs the phys address computation.
+     */
 
-#if 0
-	  if (sound_buffcounts[dev] == 1)
-	    {
-	      sound_buffcounts[dev] = 2;
-	      sound_buffsizes[dev] /= 2;
-	    }
+    dmap->raw_buf_phys = (u_long) tmpbuf;
+    for (i = 0; i < audio_devs[dev]->buffsize; i++)   *tmpbuf++ = 0x80; 
 
-	  if (sound_buffsizes[dev] > 65536)	/* Larger is not possible (yet) */
-	    sound_buffsizes[dev] = 65536;
+}
 
-	  if (sound_dsp_dmachan[dev] > 3 && sound_buffsizes[dev] > 65536)
-	    dma_pagesize = 131072;	/* 128k */
-	  else
-	    dma_pagesize = 65536;
+static void
+sound_mem_init(void)
+{
+    int             dev;
+    static u_long dsp_init_mask = 0;
 
-	  /* More sanity checks */
-
-	  if (sound_buffsizes[dev] > dma_pagesize)
-	    sound_buffsizes[dev] = dma_pagesize;
-	  sound_buffsizes[dev] &= 0xfffff000;	/* Truncate to n*4k */
-	  if (sound_buffsizes[dev] < 4096)
-	    sound_buffsizes[dev] = 4096;
-#else
-	  dma_pagesize = 4096;
-	  sound_buffsizes[dev] = 4096;
-	  sound_buffcounts[dev] = 16;	/* 16*4k -> 64k */
-#endif
-
-	  /* Now allocate the buffers */
-
-	  for (snd_raw_count[dev] = 0; snd_raw_count[dev] < sound_buffcounts[dev]; snd_raw_count[dev]++)
-	    {
-	      /*
-	       * The DMA buffer allocation algorithm hogs memory. We allocate
-	       * a memory area which is two times the requires size. This
-	       * guarantees that it contains at least one valid DMA buffer.
-	       * 
-	       * This really needs some kind of finetuning.
-	       */
-	      char           *tmpbuf = malloc (2*sound_buffsizes[dev], M_DEVBUF, M_NOWAIT);
-	      unsigned long   addr, rounded, start, end;
-
-	      if (tmpbuf == NULL)
-		{
-		  printk ("snd: Unable to allocate %d bytes of buffer\n",
-			  2 * sound_buffsizes[dev]);
-		  return;
-		}
-
-	      addr = kvtop (tmpbuf);
-	      /*
-	       * Align the start address if required
-	       */
-	      start = (addr & ~(dma_pagesize - 1));
-	      end = ((addr+sound_buffsizes[dev]-1) & ~(dma_pagesize - 1));
-
-	      if (start != end)
-	         rounded = end;
-	      else
-                 rounded = addr;	/* Fits to the same DMA page */
-
-	      snd_raw_buf[dev][snd_raw_count[dev]] =
-		&tmpbuf[rounded - addr];	/* Compute offset */
-	      /*
-	       * Use virtual address as the physical address, since
-	       * isa_dmastart performs the phys address computation.
-	       */
-	      snd_raw_buf_phys[dev][snd_raw_count[dev]] =
-		(unsigned long) snd_raw_buf[dev][snd_raw_count[dev]];
-	    }
-	}			/* for dev */
-
+    for (dev = 0; dev < num_audiodevs; dev++)	/* Enumerate devices */
+	if (!(dsp_init_mask & (1 << dev)))	/* Not already done */
+	    if (audio_devs[dev]->dmachan1 >= 0) {
+		dsp_init_mask |= (1 << dev);
+		audio_devs[dev]->buffsize = DSP_BUFFSIZE;
+		/* Now allocate the buffers */
+		alloc_dmap(dev, audio_devs[dev]->dmachan1,
+			audio_devs[dev]->dmap_out);
+		if (audio_devs[dev]->flags & DMA_DUPLEX)
+		    alloc_dmap(dev, audio_devs[dev]->dmachan2,
+			    audio_devs[dev]->dmap_in);
+	    }	/* for dev */
 }
 
 #endif
 
-struct isa_driver snddriver =
-{sndprobe, sndattach, "snd"};
 
 int
-snd_ioctl_return (int *addr, int value)
+snd_ioctl_return(int *addr, int value)
 {
-  if (value < 0)
-    return value;		/* Error */
-  suword (addr, value);
-  return 0;
+    if (value < 0)
+	return value;	/* Error */
+    suword(addr, value);
+    return 0;
 }
 
+#define MAX_UNIT 50
+typedef void    (*irq_proc_t) (int irq);
+static irq_proc_t irq_proc[MAX_UNIT] = {NULL};
+static int      irq_irq[MAX_UNIT] = {0};
+
 int
-snd_set_irq_handler (int interrupt_level, void(*hndlr)(int))
+snd_set_irq_handler(int int_lvl, void (*hndlr) (int), sound_os_info * osp)
 {
-  return 1;
+    if (osp->unit >= MAX_UNIT) {
+	printf("Sound error: Unit number too high (%d)\n", osp->unit);
+	return 0;
+    }
+    irq_proc[osp->unit] = hndlr;
+    irq_irq[osp->unit] = int_lvl;
+    return 1;
 }
 
 void
-snd_release_irq(int vect)
+sndintr(int unit)
 {
+    if ( (unit >= MAX_UNIT) || (irq_proc[unit] == NULL) )
+	return;
+
+    irq_proc[unit] (irq_irq[unit]);	/* Call the installed handler */
 }
 
-#endif
+void
+conf_printf(char *name, struct address_info * hw_config)
+{
+    if (!trace_init)
+	return;
+
+    printf("<%s> ", name);
+    if (hw_config->io_base != -1 ) 
+    printf("at 0x%03x", hw_config->io_base);
+
+    if (hw_config->irq != -1 )
+	printf(" irq %d", hw_config->irq);
+
+    if (hw_config->dma != -1 || hw_config->dma2 != -1) {
+	printf(" dma %d", hw_config->dma);
+	if (hw_config->dma2 != -1)
+	    printf(",%d", hw_config->dma2);
+    }
+
+
+}
+
+void
+conf_printf2(char *name, int base, int irq, int dma, int dma2)
+{
+    if (!trace_init)
+	return;
+
+    printf("<%s> at 0x%03x", name, base);
+
+    if (irq)
+	printf(" irq %d", irq);
+
+    if (dma != -1 || dma2 != -1) {
+	printf(" dma %d", dma);
+	if (dma2 != -1)
+	    printf(",%d", dma2);
+    }
+
+
+}
+
+
+void tenmicrosec (int j)
+{
+  int             i, k;
+  for (k = 0; k < j/10 ; k++) {
+      for (i = 0; i < 16; i++)
+	  inb (0x80);
+  }
+}
+
+#endif	/* NSND > 0 */
+
+
+
+

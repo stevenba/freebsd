@@ -40,8 +40,8 @@
  *		byte 1 		- Synthesizer device number (0-N)
  *		byte 2 		- Command (see below)
  *		byte 3 		- Voice number (0-31)
- *		bytes 4 and 5	- parameter P1 (unsigned short)
- *		bytes 6 and 7	- parameter P2 (unsigned short)
+ *		bytes 4 and 5	- parameter P1 (u_short)
+ *		bytes 6 and 7	- parameter P2 (u_short)
  *
  *	Commands:
  *		Each command affects one voice defined in byte 3.
@@ -90,32 +90,48 @@
  *	GUS API macros
  */
 
-#define _GUS_CMD(chn, voice, cmd, p1, p2) \
-					{_SEQ_NEEDBUF(8); _seqbuf[_seqbufptr] = SEQ_PRIVATE;\
-					_seqbuf[_seqbufptr+1] = (chn); _seqbuf[_seqbufptr+2] = cmd;\
-					_seqbuf[_seqbufptr+3] = voice;\
-					*(unsigned short*)&_seqbuf[_seqbufptr+4] = p1;\
-					*(unsigned short*)&_seqbuf[_seqbufptr+6] = p2;\
-					_SEQ_ADVBUF(8);}
+#define _GUS_CMD(chn, voice, cmd, p1, p2) {\
+	_SEQ_NEEDBUF(8); _seqbuf[_seqbufptr] = SEQ_PRIVATE;\
+	_seqbuf[_seqbufptr+1] = (chn); _seqbuf[_seqbufptr+2] = cmd;\
+	_seqbuf[_seqbufptr+3] = voice;\
+	*(u_short*)&_seqbuf[_seqbufptr+4] = p1;\
+	*(u_short*)&_seqbuf[_seqbufptr+6] = p2;\
+	_SEQ_ADVBUF(8);}
 
-#define GUS_NUMVOICES(chn, p1)			_GUS_CMD(chn, 0, _GUS_NUMVOICES, (p1), 0)
-#define GUS_VOICESAMPLE(chn, voice, p1)		_GUS_CMD(chn, voice, _GUS_VOICESAMPLE, (p1), 0)	/* OBSOLETE */
-#define GUS_VOICEON(chn, voice, p1)		_GUS_CMD(chn, voice, _GUS_VOICEON, (p1), 0)
-#define GUS_VOICEOFF(chn, voice)		_GUS_CMD(chn, voice, _GUS_VOICEOFF, 0, 0)
-#define GUS_VOICEFADE(chn, voice)		_GUS_CMD(chn, voice, _GUS_VOICEFADE, 0, 0)
-#define GUS_VOICEMODE(chn, voice, p1)		_GUS_CMD(chn, voice, _GUS_VOICEMODE, (p1), 0)
-#define GUS_VOICEBALA(chn, voice, p1)		_GUS_CMD(chn, voice, _GUS_VOICEBALA, (p1), 0)
-#define GUS_VOICEFREQ(chn, voice, p)		_GUS_CMD(chn, voice, _GUS_VOICEFREQ, \
-							(p) & 0xffff, ((p) >> 16) & 0xffff)
-#define GUS_VOICEVOL(chn, voice, p1)		_GUS_CMD(chn, voice, _GUS_VOICEVOL, (p1), 0)
-#define GUS_VOICEVOL2(chn, voice, p1)		_GUS_CMD(chn, voice, _GUS_VOICEVOL2, (p1), 0)
-#define GUS_RAMPRANGE(chn, voice, low, high)	_GUS_CMD(chn, voice, _GUS_RAMPRANGE, (low), (high))
-#define GUS_RAMPRATE(chn, voice, p1, p2)	_GUS_CMD(chn, voice, _GUS_RAMPRATE, (p1), (p2))
-#define GUS_RAMPMODE(chn, voice, p1)		_GUS_CMD(chn, voice, _GUS_RAMPMODE, (p1), 0)
-#define GUS_RAMPON(chn, voice, p1)		_GUS_CMD(chn, voice, _GUS_RAMPON, (p1), 0)
-#define GUS_RAMPOFF(chn, voice)			_GUS_CMD(chn, voice, _GUS_RAMPOFF, 0, 0)
-#define GUS_VOLUME_SCALE(chn, voice, p1, p2)	_GUS_CMD(chn, voice, _GUS_VOLUME_SCALE, (p1), (p2))
-#define GUS_VOICE_POS(chn, voice, p)		_GUS_CMD(chn, voice, _GUS_VOICE_POS, \
-							(p) & 0xffff, ((p) >> 16) & 0xffff)
+#define GUS_NUMVOICES(chn, p1)	_GUS_CMD(chn, 0, _GUS_NUMVOICES, (p1), 0)
+#define GUS_VOICESAMPLE(chn, voice, p1)	\
+	_GUS_CMD(chn, voice, _GUS_VOICESAMPLE, (p1), 0)	/* OBSOLETE */
+#define GUS_VOICEON(chn, voice, p1)	\
+	_GUS_CMD(chn, voice, _GUS_VOICEON, (p1), 0)
+#define GUS_VOICEOFF(chn, voice)	\
+	_GUS_CMD(chn, voice, _GUS_VOICEOFF, 0, 0)
+#define GUS_VOICEFADE(chn, voice)	\
+	_GUS_CMD(chn, voice, _GUS_VOICEFADE, 0, 0)
+#define GUS_VOICEMODE(chn, voice, p1)	\
+	_GUS_CMD(chn, voice, _GUS_VOICEMODE, (p1), 0)
+#define GUS_VOICEBALA(chn, voice, p1)	\
+	_GUS_CMD(chn, voice, _GUS_VOICEBALA, (p1), 0)
+#define GUS_VOICEFREQ(chn, voice, p)	\
+	_GUS_CMD(chn, voice, _GUS_VOICEFREQ, \
+	(p) & 0xffff, ((p) >> 16) & 0xffff)
+#define GUS_VOICEVOL(chn, voice, p1)	\
+	_GUS_CMD(chn, voice, _GUS_VOICEVOL, (p1), 0)
+#define GUS_VOICEVOL2(chn, voice, p1)	\
+	_GUS_CMD(chn, voice, _GUS_VOICEVOL2, (p1), 0)
+#define GUS_RAMPRANGE(chn, voice, low, high)	\
+	_GUS_CMD(chn, voice, _GUS_RAMPRANGE, (low), (high))
+#define GUS_RAMPRATE(chn, voice, p1, p2)	\
+	_GUS_CMD(chn, voice, _GUS_RAMPRATE, (p1), (p2))
+#define GUS_RAMPMODE(chn, voice, p1)	\
+	_GUS_CMD(chn, voice, _GUS_RAMPMODE, (p1), 0)
+#define GUS_RAMPON(chn, voice, p1)	\
+	_GUS_CMD(chn, voice, _GUS_RAMPON, (p1), 0)
+#define GUS_RAMPOFF(chn, voice)		\
+	_GUS_CMD(chn, voice, _GUS_RAMPOFF, 0, 0)
+#define GUS_VOLUME_SCALE(chn, voice, p1, p2)	\
+	_GUS_CMD(chn, voice, _GUS_VOLUME_SCALE, (p1), (p2))
+#define GUS_VOICE_POS(chn, voice, p)	\
+	_GUS_CMD(chn, voice, _GUS_VOICE_POS, \
+	(p) & 0xffff, ((p) >> 16) & 0xffff)
 
 #endif
