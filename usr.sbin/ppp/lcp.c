@@ -573,8 +573,7 @@ LcpLayerUp(struct fsm *fp)
   struct lcp *lcp = fsm2lcp(fp);
 
   log_Printf(LogLCP, "%s: LayerUp\n", fp->link->name);
-  physical_SetAsyncParams(p, lcp->want_accmap,
-                          lcp->his_accmap | lcp->want_accmap);
+  physical_SetAsyncParams(p, lcp->want_accmap, lcp->his_accmap);
   lqr_Start(lcp);
   hdlc_StartTimer(&p->hdlc);
   fp->more.reqs = fp->more.naks = fp->more.rejs = lcp->cfg.fsm.maxreq * 3;

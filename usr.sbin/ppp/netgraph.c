@@ -575,6 +575,25 @@ ng_Create(struct physical *p)
           return ng_Abandon(dev, p);
         }
 
+        /* Get a list of node hooks */
+        if (NgSendMsg(dev->cs, path, NGM_GENERIC_COOKIE, NGM_LISTHOOKS,
+                      NULL, 0) < 0) {
+          log_Printf(LogWARN, "%s: %s Cannot send a LISTHOOOKS message: %s\n",
+                     p->link.name, path, strerror(errno));
+          return ng_Abandon(dev, p);
+        }
+
+        /* Get our list back */
+        resp = (struct ng_mesg *)rbuf;
+        if (NgRecvMsg(dev->cs, resp, sizeof rbuf, NULL) <= 0) {
+          log_Printf(LogWARN, "%s: Cannot get netgraph response: %s\n",
+                     p->link.name, strerror(errno));
+          return ng_Abandon(dev, p);
+        }
+
+        hlist = (const struct hooklist *)resp->data;
+        ninfo = &hlist->nodeinfo;
+
         log_Printf(LogDEBUG, "List of netgraph node ``%s'' (id %x) hooks:\n",
                    path, ninfo->id);
 

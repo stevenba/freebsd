@@ -619,11 +619,18 @@ bundle_DescriptorWrite(struct fdescriptor *d, struct bundle *bundle,
 
   /* This is not actually necessary as struct mpserver doesn't Write() */
   if (descriptor_IsSet(&bundle->ncp.mp.server.desc, fdset))
-    descriptor_Write(&bundle->ncp.mp.server.desc, bundle, fdset);
+    if (descriptor_Write(&bundle->ncp.mp.server.desc, bundle, fdset) == 1)
+      result++;
 
   for (dl = bundle->links; dl; dl = dl->next)
     if (descriptor_IsSet(&dl->desc, fdset))
-      result += descriptor_Write(&dl->desc, bundle, fdset);
+      switch (descriptor_Write(&dl->desc, bundle, fdset)) {
+      case -1:
+        datalink_ComeDown(dl, CLOSE_NORMAL);
+        break;
+      case 1:
+        result++;
+      }
 
   return result;
 }

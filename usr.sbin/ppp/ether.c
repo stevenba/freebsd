@@ -486,7 +486,7 @@ ether_Create(struct physical *p)
     sprintf(path, "%.*s:", ifacelen, iface);
     if (NgSendMsg(dev->cs, path, NGM_GENERIC_COOKIE, NGM_LISTHOOKS,
                   NULL, 0) < 0) {
-      log_Printf(LogWARN, "%s: Cannot send a netgraph message: %s\n",
+      log_Printf(LogWARN, "%s Cannot send a netgraph message: %s\n",
                  path, strerror(errno));
       return ether_Abandon(dev, p);
     }
@@ -554,7 +554,7 @@ ether_Create(struct physical *p)
 
       if (NgSendMsg(dev->cs, etherid, NGM_GENERIC_COOKIE,
                     NGM_MKPEER, &mkp, sizeof mkp) < 0) {
-        log_Printf(LogWARN, "%s: Cannot create PPPoE netgraph node: %s\n",
+        log_Printf(LogWARN, "%s Cannot create PPPoE netgraph node: %s\n",
                    etherid, strerror(errno));
         return ether_Abandon(dev, p);
       }
