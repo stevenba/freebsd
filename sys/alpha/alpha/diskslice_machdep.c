@@ -35,15 +35,16 @@
  *
  *	from: @(#)ufs_disksubr.c	7.16 (Berkeley) 5/4/91
  *	from: ufs_disksubr.c,v 1.8 1994/06/07 01:21:39 phk Exp $
- *	$Id: diskslice_machdep.c,v 1.27 1997/12/02 21:06:20 phk Exp $
+ *	from: i386/isa Id: diskslice_machdep.c,v 1.31 1998/08/10 07:22:14 phk Exp
+ * $FreeBSD$
  */
 
-#include <stddef.h>
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/conf.h>
 #include <sys/disklabel.h>
 #define	DOSPTYP_EXTENDED	5
+#define	DOSPTYP_EXTENDEDX	15
 #define	DOSPTYP_ONTRACK		84
 #include <sys/diskslice.h>
 #include <sys/malloc.h>
@@ -137,8 +138,8 @@ check_part(sname, dp, offset, nsectors, ntracks, mbr_offset )
 	error = (ssector == ssector1 && esector == esector1) ? 0 : EINVAL;
 	if (bootverbose)
 		printf("%s: type 0x%x, start %lu, end = %lu, size %lu %s\n",
-		       sname, dp->dp_typ, ssector1, esector1, dp->dp_size,
-		       error ? "" : ": OK");
+		       sname, dp->dp_typ, ssector1, esector1,
+		       (u_long)dp->dp_size, error ? "" : ": OK");
 	if (ssector != ssector1 && bootverbose)
 		printf("%s: C/H/S start %d/%d/%d (%lu) != start %lu: invalid\n",
 		       sname, chs_scyl, dp->dp_shd, chs_ssect,
@@ -163,6 +164,7 @@ dsinit(dname, dev, strat, lp, sspp)
 	int	dospart;
 	struct dos_partition *dp;
 	struct dos_partition *dp0;
+	struct dos_partition dpcopy[NDOSPART];
 	int	error;
 	int	max_ncyls;
 	int	max_nsectors;
@@ -173,21 +175,6 @@ dsinit(dname, dev, strat, lp, sspp)
 	char	*sname;
 	struct diskslice *sp;
 	struct diskslices *ssp;
-
-	/*
-	 * Allocate a dummy slices "struct" and initialize it to contain
-	 * only an empty compatibility slice (pointing to itself) and a
-	 * whole disk slice (covering the disk as described by the label).
-	 * If there is an error, then the dummy struct becomes final.
-	 */
-	ssp = malloc(offsetof(struct diskslices, dss_slices)
-		     + BASE_SLICE * sizeof *sp, M_DEVBUF, M_WAITOK);
-	*sspp = ssp;
-	ssp->dss_first_bsd_slice = COMPATIBILITY_SLICE;
-	ssp->dss_nslices = BASE_SLICE;
-	sp = &ssp->dss_slices[0];
-	bzero(sp, BASE_SLICE * sizeof *sp);
-	sp[WHOLE_DISK_SLICE].ds_size = lp->d_secperunit;
 
 	mbr_offset = DOSBBSECTOR;
 reread_mbr:
@@ -200,7 +187,7 @@ reread_mbr:
 	(*strat)(bp);
 	if (biowait(bp) != 0) {
 		diskerr(bp, dname, "error reading primary partition table",
-			LOG_PRINTF, 0, lp);
+		    LOG_PRINTF, 0, (struct disklabel *)NULL);
 		printf("\n");
 		error = EIO;
 		goto done;
@@ -217,7 +204,13 @@ reread_mbr:
 		error = EINVAL;
 		goto done;
 	}
-	dp0 = (struct dos_partition *)(cp + DOSPARTOFF);
+	/*
+	 * Take a temporary copy of the partition table to avoid
+	 * alignment problems.
+	 */
+	memcpy(dpcopy, cp + DOSPARTOFF,
+	       NDOSPART * sizeof(struct dos_partition));
+	dp0 = &dpcopy[0];
 
 	/* Check for "Ontrack Diskmanager". */
 	for (dospart = 0, dp = dp0; dospart < NDOSPART; dospart++, dp++) {
@@ -315,21 +308,18 @@ reread_mbr:
 	}
 
 	/*
-	 * Free the dummy slices "struct" and allocate a real new one.
-	 * Initialize special slices as above.
+	 * We are passed a pointer to a suitably initialized minimal
+	 * slices "struct" with no dangling pointers in it.  Replace it
+	 * by a maximal one.  This usually oversizes the "struct", but
+	 * enlarging it while searching for logical drives would be
+	 * inconvenient.
 	 */
-	free(ssp, M_DEVBUF);
-	ssp = malloc(offsetof(struct diskslices, dss_slices)
-#define	MAX_SLICES_SUPPORTED	MAX_SLICES  /* was (BASE_SLICE + NDOSPART) */
-		     + MAX_SLICES_SUPPORTED * sizeof *sp, M_DEVBUF, M_WAITOK);
+	free(*sspp, M_DEVBUF);
+	ssp = dsmakeslicestruct(MAX_SLICES, lp);
 	*sspp = ssp;
-	ssp->dss_first_bsd_slice = COMPATIBILITY_SLICE;
-	sp = &ssp->dss_slices[0];
-	bzero(sp, MAX_SLICES_SUPPORTED * sizeof *sp);
-	sp[WHOLE_DISK_SLICE].ds_size = lp->d_secperunit;
 
 	/* Initialize normal slices. */
-	sp += BASE_SLICE;
+	sp = &ssp->dss_slices[BASE_SLICE];
 	for (dospart = 0, dp = dp0; dospart < NDOSPART; dospart++, dp++, sp++) {
 		sp->ds_offset = mbr_offset + dp->dp_start;
 		sp->ds_size = dp->dp_size;
@@ -344,7 +334,8 @@ reread_mbr:
 	/* Handle extended partitions. */
 	sp -= NDOSPART;
 	for (dospart = 0; dospart < NDOSPART; dospart++, sp++)
-		if (sp->ds_type == DOSPTYP_EXTENDED)
+		if (sp->ds_type == DOSPTYP_EXTENDED || 
+                    sp->ds_type == DOSPTYP_EXTENDEDX)
 			extended(dname, bp->b_dev, strat, lp, ssp,
 				 sp->ds_offset, sp->ds_size, sp->ds_offset,
 				 max_nsectors, max_ntracks, mbr_offset);
@@ -376,6 +367,8 @@ extended(dname, dev, strat, lp, ssp, ext_offset, ext_size, base_ext_offset,
 	u_char	*cp;
 	int	dospart;
 	struct dos_partition *dp;
+	struct dos_partition *dp0;
+	struct dos_partition dpcopy[NDOSPART];
 	u_long	ext_offsets[NDOSPART];
 	u_long	ext_sizes[NDOSPART];
 	char	partname[2];
@@ -392,7 +385,7 @@ extended(dname, dev, strat, lp, ssp, ext_offset, ext_size, base_ext_offset,
 	(*strat)(bp);
 	if (biowait(bp) != 0) {
 		diskerr(bp, dname, "error reading extended partition table",
-			LOG_PRINTF, 0, lp);
+		    LOG_PRINTF, 0, (struct disklabel *)NULL);
 		printf("\n");
 		goto done;
 	}
@@ -407,21 +400,28 @@ extended(dname, dev, strat, lp, ssp, ext_offset, ext_size, base_ext_offset,
 			       sname);
 		goto done;
 	}
+	/*
+	 * Take a temporary copy of the partition table to avoid
+	 * alignment problems.
+	 */
+	memcpy(dpcopy, cp + DOSPARTOFF,
+	       NDOSPART * sizeof(struct dos_partition));
+	dp0 = &dpcopy[0];
 
-	for (dospart = 0,
-	     dp = (struct dos_partition *)(bp->b_data + DOSPARTOFF),
+	for (dospart = 0, dp = dp0,
 	     slice = ssp->dss_nslices, sp = &ssp->dss_slices[slice];
 	     dospart < NDOSPART; dospart++, dp++) {
 		ext_sizes[dospart] = 0;
 		if (dp->dp_scyl == 0 && dp->dp_shd == 0 && dp->dp_ssect == 0
 		    && dp->dp_start == 0 && dp->dp_size == 0)
 			continue;
-		if (dp->dp_typ == DOSPTYP_EXTENDED) {
+		if (dp->dp_typ == DOSPTYP_EXTENDED || 
+                    dp->dp_typ == DOSPTYP_EXTENDEDX) {
 			char buf[32];
 
 			sname = dsname(dname, dkunit(dev), WHOLE_DISK_SLICE,
 				       RAW_PART, partname);
-			strcpy(buf, sname);
+			snprintf(buf, sizeof(buf), "%s", sname);
 			if (strlen(buf) < sizeof buf - 11)
 				strcat(buf, "<extended>");
 			check_part(buf, dp, base_ext_offset, nsectors,
@@ -458,4 +458,17 @@ extended(dname, dev, strat, lp, ssp, ext_offset, ext_size, base_ext_offset,
 done:
 	bp->b_flags |= B_INVAL | B_AGE;
 	brelse(bp);
+}
+
+void
+alpha_fix_srm_checksum(bp)
+	struct buf *bp;
+{
+	u_int64_t *p = (u_int64_t *) bp->b_data;
+	u_int64_t sum = 0;
+	int i;
+
+	for (i = 0; i < 63; i++)
+		sum += p[i];
+	p[63] = sum;
 }

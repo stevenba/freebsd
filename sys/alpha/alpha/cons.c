@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)cons.c	7.2 (Berkeley) 5/9/91
- *	$Id: cons.c,v 1.57 1998/03/28 10:32:56 bde Exp $
+ * $FreeBSD$
  */
 
 #include "opt_devfs.h"
@@ -90,7 +90,7 @@ static struct cdevsw cn_cdevsw =
 	  cnpoll,	nommap,		NULL,	"console",	NULL,	-1 };
 
 static dev_t	cn_dev_t; 	/* seems to be never really used */
-SYSCTL_OPAQUE(_machdep, CPU_CONSDEV, consdev, CTLTYPE_OPAQUE|CTLFLAG_RD,
+SYSCTL_OPAQUE(_machdep, CPU_CONSDEV, consdev, CTLFLAG_RD,
 	&cn_dev_t, sizeof cn_dev_t, "T,dev_t", "");
 
 static int cn_mute;
@@ -424,7 +424,7 @@ cnputc(c)
 	}
 }
 
-static cn_devsw_installed = 0;
+static int cn_devsw_installed = 0;
 
 static void
 cn_drvinit(void *unused)
