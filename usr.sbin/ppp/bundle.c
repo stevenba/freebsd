@@ -701,7 +701,7 @@ bundle_Create(const char *prefix, int type, int unit)
 	 * Attempt to load the tunnel interface KLD if it isn't loaded
 	 * already.
          */
-        loadmodules("if_tun", NULL);
+        loadmodules(LOAD_VERBOSLY, "if_tun", NULL);
         continue;
       }
 #endif

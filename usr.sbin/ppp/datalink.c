@@ -473,39 +473,6 @@ datalink_Read(struct fdescriptor *d, struct bundle *bundle, const fd_set *fdset)
   }
 }
 
-static int
-datalink_Write(struct fdescriptor *d, struct bundle *bundle, const fd_set *fdset)
-{
-  struct datalink *dl = descriptor2datalink(d);
-  int result = 0;
-
-  switch (dl->state) {
-    case DATALINK_CLOSED:
-    case DATALINK_OPENING:
-      break;
-
-    case DATALINK_HANGUP:
-    case DATALINK_DIAL:
-    case DATALINK_LOGOUT:
-    case DATALINK_LOGIN:
-      result = descriptor_Write(&dl->chat.desc, bundle, fdset);
-      break;
-
-    case DATALINK_READY:
-    case DATALINK_LCP:
-    case DATALINK_AUTH:
-    case DATALINK_CBCP:
-    case DATALINK_OPEN:
-      if (descriptor_IsSet(&dl->chap.desc, fdset))
-        result += descriptor_Write(&dl->chap.desc, bundle, fdset);
-      if (descriptor_IsSet(&dl->physical->desc, fdset))
-        result += descriptor_Write(&dl->physical->desc, bundle, fdset);
-      break;
-  }
-
-  return result;
-}
-
 static void
 datalink_ComeDown(struct datalink *dl, int how)
 {
@@ -535,6 +502,42 @@ datalink_ComeDown(struct datalink *dl, int how)
     } else
       datalink_HangupDone(dl);
   }
+}
+
+static int
+datalink_Write(struct fdescriptor *d, struct bundle *bundle, const fd_set *fdset)
+{
+  struct datalink *dl = descriptor2datalink(d);
+  int result = 0;
+
+  switch (dl->state) {
+    case DATALINK_CLOSED:
+    case DATALINK_OPENING:
+      break;
+
+    case DATALINK_HANGUP:
+    case DATALINK_DIAL:
+    case DATALINK_LOGOUT:
+    case DATALINK_LOGIN:
+      if ((result = descriptor_Write(&dl->chat.desc, bundle, fdset)) == -1) {
+        datalink_ComeDown(dl, CLOSE_NORMAL);
+        result = 0;
+      }
+      break;
+
+    case DATALINK_READY:
+    case DATALINK_LCP:
+    case DATALINK_AUTH:
+    case DATALINK_CBCP:
+    case DATALINK_OPEN:
+      if (descriptor_IsSet(&dl->chap.desc, fdset))
+        result += descriptor_Write(&dl->chap.desc, bundle, fdset);
+      if (descriptor_IsSet(&dl->physical->desc, fdset))
+        result += descriptor_Write(&dl->physical->desc, bundle, fdset);
+      break;
+  }
+
+  return result;
 }
 
 static void

@@ -82,7 +82,7 @@ SRCS+=	i4b.c
 .if defined(NONETGRAPH)
 CFLAGS+=-DNONETGRAPH
 .else
-SRCS+=	ether.c
+SRCS+=	ether.c netgraph.c
 LDADD+=	-lnetgraph
 DPADD+= ${LIBNETGRAPH}
 .endif

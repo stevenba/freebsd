@@ -399,14 +399,15 @@ zerofdset(fd_set *s)
 }
 
 void
-loadmodules(const char *module, ...)
+loadmodules(int how, const char *module, ...)
 {
 #if defined(__FreeBSD__) && !defined(NOKLDLOAD)
   va_list ap;
 
   va_start(ap, module);
   while (module != NULL) {
-    if (modfind(module) == -1 && ID0kldload(module) == -1)
+    if (modfind(module) == -1 && ID0kldload(module) == -1 &&
+        how == LOAD_VERBOSLY)
       log_Printf(LogWARN, "%s: Cannot load module\n", module);
     module = va_arg(ap, const char *);
   }

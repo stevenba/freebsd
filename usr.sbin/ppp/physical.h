@@ -36,6 +36,7 @@ struct cmdargs;
 #define ETHER_DEVICE	5
 #define EXEC_DEVICE	6
 #define ATM_DEVICE	7
+#define NG_DEVICE	8
 
 /* Returns from awaitcarrier() */
 #define CARRIER_PENDING	1

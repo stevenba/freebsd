@@ -95,6 +95,7 @@
 #endif
 #ifndef NONETGRAPH
 #include "ether.h"
+#include "netgraph.h"
 #endif
 #ifndef NOATM
 #include "atm.h"
@@ -122,8 +123,9 @@ struct {
 #endif
   { tty_Create, tty_iov2device, tty_DeviceSize },
 #ifndef NONETGRAPH
-  /* This must come before ``udp'' & ``tcp'' */
+  /* These must come before ``udp'' & ``tcp'' */
   { ether_Create, ether_iov2device, ether_DeviceSize },
+  { ng_Create, ng_iov2device, ng_DeviceSize },
 #endif
 #ifndef NOATM
   /* and so must this */

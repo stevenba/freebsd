@@ -261,7 +261,8 @@ LoadLineDiscipline(struct physical *p)
   reply = (struct ng_mesg *)rbuf;
   info = (struct nodeinfo *)reply->data;
 
-  loadmodules("netgraph", "ng_tty", "ng_async", "ng_socket", NULL);
+  loadmodules(LOAD_VERBOSLY, "netgraph", "ng_tty", "ng_async", "ng_socket",
+              NULL);
 
   /* Get the speed before loading the line discipline */
   speed = physical_GetSpeed(p);
