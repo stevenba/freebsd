@@ -1,9 +1,0 @@
-#	@(#)Makefile	8.1 (Berkeley) 5/31/93
-#	$Id: Makefile,v 1.6 1997/08/09 22:34:01 brian Exp $
-
-PROG=	date
-SRCS=	date.c netdate.c vary.c
-DPADD=	${LIBUTIL}
-LDADD=	-lutil
-
-.include <bsd.prog.mk>
