@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, [92/04/03  16:51:14  rvb]
- *	$Id: boot.c,v 1.56.2.6 1996/09/10 23:59:42 julian Exp $
+ *	$Id: boot.c,v 1.56.2.7 1996/09/12 03:08:58 julian Exp $
  */
 
 
@@ -139,7 +139,6 @@ boot(int drive)
 #endif	/*NAMEBLOCK*/
 loadstart:
 	name = dflname;
-	bcopy(name,namebuf,32); /* really want strcpy but why bloat? */
 	/* print this all each time.. (saves space to do so) */
 	/* If we have looped, use the previous entries as defaults */
 	printf("\n>> FreeBSD BOOT @ 0x%x: %d/%d k of memory\n"
@@ -156,16 +155,17 @@ loadstart:
 		init_serial();	/* clear all, but leave serial console */
 
 	if (!gets(namebuf)) {
+		bcopy(name,namebuf,32); /* really want strcpy but why bloat? */
 		putchar('\n');
 	}
-	{ /* delclare a local variable here to force Gcc's hand (make it a reg) */
+	{ /* declare a local variable here to force Gcc's hand (make it a reg) */
 		char *ptr;
 
 		ptr = namebuf;
 		/*
-	 	* now parse out the boot options from what was given to us
-	 	* (or was read from the default string)
-	 	*/
+		 * now parse out the boot options from what was given to us
+		 * (or was read from the default string)
+		 */
 		while (*ptr != '\0') {
 			char c;
 			/*
@@ -217,7 +217,7 @@ loadstart:
 				name = ptr;
 				while ((c = *++ptr) != '\0') {
 					if ( c == ' ') {
-						*ptr = '\0';
+						*ptr++ = '\0';
 						break;
 					}
 				}
