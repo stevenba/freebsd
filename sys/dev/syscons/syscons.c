@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from:@(#)syscons.c	1.3 940129
- *	$Id: syscons.c,v 1.35 1994/02/07 02:14:27 davidg Exp $
+ *	$Id: syscons.c,v 1.35.2.1 1994/03/24 07:38:58 rgrimes Exp $
  *
  */
 
@@ -1681,6 +1681,8 @@ static void scan_esc(scr_stat *scp, u_char c)
 
 		case 'S':	/* scroll up n lines */
 			n = scp->term.param[0]; if (n < 1)  n = 1;
+			if (n > scp->ypos)
+				n = scp->ypos;
 			bcopy(scp->crt_base + (scp->xsize * n),
 			      scp->crt_base, 
 			      scp->xsize * (scp->ysize - n) * 
@@ -1693,16 +1695,20 @@ static void scan_esc(scr_stat *scp, u_char c)
 
 		case 'T':	/* scroll down n lines */
 			n = scp->term.param[0]; if (n < 1)  n = 1;
+			if (n > scp->ysize - scp->ypos)
+				n = scp->ysize - scp->ypos;
 			bcopy(scp->crt_base, 
 			      scp->crt_base + (scp->xsize * n),
 			      scp->xsize * (scp->ysize - n) * 
 			      sizeof(u_short));
-			fillw(scp->term.cur_attr | scr_map[0x20], scp->crt_base, 
-			      scp->xsize);
+			fillw(scp->term.cur_attr | scr_map[0x20], 
+			      scp->crt_base, scp->xsize);
 			break;
 
 		case 'X':	/* delete n characters in line */
 			n = scp->term.param[0]; if (n < 1)  n = 1;
+			if (n > scp->xsize - scp->xpos)
+				n = scp->xsize - scp->xpos;
 			fillw(scp->term.cur_attr | scr_map[0x20], 
                               scp->crt_base + scp->xpos + 
 			      ((scp->xsize*scp->ypos) * sizeof(u_short)), n);
