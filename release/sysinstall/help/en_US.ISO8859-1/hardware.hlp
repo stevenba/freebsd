@@ -1,4 +1,4 @@
-Hardware Documentation Guide:  $Id: hardware.hlp,v 1.11 1995/06/09 13:29:19 jkh Exp $
+Hardware Documentation Guide:  $Id: hardware.hlp,v 1.12 1995/06/10 01:25:28 jkh Exp $
 
 Table of Contents
 -----------------
@@ -380,5 +380,11 @@ A: This is not actually a hang, simply a very LONG "wdc0" probe that
    usually _isn't_ a WD controller).  Be patient, your system will boot!
    To eliminate the problem, boot with the -c flag and eliminate the wdc0
    device, or compile a custom kernel.
+
+Q: My sytem can not find an Intel EtherExpress 16 card.
+
+A: You must set your Intel EtherExpress 16 card to be memory mapped at
+   address 0xD0000, and set the amount of mapped memory to 32K using
+   the Intel supplied softset.exe program.
 
 [ Please add more hardware tips to this Q&A section! ]
