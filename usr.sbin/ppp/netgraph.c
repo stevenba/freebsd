@@ -75,7 +75,10 @@
 #include "datalink.h"
 #include "slcompress.h"
 #include "iplist.h"
+#include "ncpaddr.h"
 #include "ipcp.h"
+#include "ipv6cp.h"
+#include "ncp.h"
 #include "filter.h"
 #ifndef NORADIUS
 #include "radius.h"
@@ -296,6 +299,7 @@ ng_device2iov(struct device *d, struct iovec *iov, int *niov,
 static const struct device basengdevice = {
   NG_DEVICE,
   "netgraph",
+  0,
   { CD_REQUIRED, DEF_NGCDDELAY },
   NULL,
   ng_RemoveFromSet,
