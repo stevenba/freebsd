@@ -102,11 +102,13 @@ unlock (repository)
      * lead to the limitation that one user ID should not be committing
      * files into the same Repository directory at the same time. Oh well.
      */
-    (void) sprintf (tmp, "%s/%s", repository, CVSLCK);
-    if (stat (tmp, &sb) != -1 && sb.st_uid == geteuid () &&
-	(writelock[0] != '\0' || (readlock[0] != '\0' && cleanup_lckdir)))
+    if (writelock[0] != '\0' || (readlock[0] != '\0' && cleanup_lckdir)) 
     {
-	(void) rmdir (tmp);
+	(void) sprintf (tmp, "%s/%s", repository, CVSLCK);
+	if (stat (tmp, &sb) != -1 && sb.st_uid == geteuid ())
+	{
+	    (void) rmdir (tmp);
+	}
     }
     cleanup_lckdir = 0;
 }
@@ -527,6 +529,7 @@ clear_lock()
 {
     if (rmdir (masterlock) < 0)
 	error (0, errno, "failed to remove lock dir `%s'", masterlock);
+    cleanup_lckdir = 0;
 }
 
 /*
