@@ -53,7 +53,6 @@ The FreeBSD Core Team
 	Justin Gibbs <gibbs@FreeBSD.org>
 	Poul-Henning Kamp <phk@FreeBSD.org>
 	Rich Murphey <rich@FreeBSD.org>
-	Rodney W. Grimes <rgrimes@FreeBSD.org>
 	Satoshi Asami <asami@FreeBSD.org>
 	Søren Schmidt <sos@FreeBSD.org>
 
@@ -159,6 +158,7 @@ Peter Wemm <peter@haywire.DIALix.COM>
 Philippe Charnier <charnier@lirmm.fr>
 Rob Shady <rls@id.net>
 Rob Snow <rsnow@txdirect.net>
+Rodney W. Grimes <rgrimes@FreeBSD.org>
 Richard Stallman <rms@gnu.ai.mit.edu>
 Sascha Wildner <swildner@channelz.GUN.de>
 Scott Mace <smace@FreeBSD.org>
@@ -275,4 +275,4 @@ Last, but not least, the release engineer would like to thank:
 	His Wife, for chocolate chip cookies, and some other things.
 	The DGB project @ TFS, for patience and tolerance.
 
-$Id: CONTRIB.FreeBSD,v 1.13.4.3 1995/08/24 23:22:39 davidg Exp $
+$Id: CONTRIB.FreeBSD,v 1.13.4.4 1995/09/17 10:10:05 davidg Exp $
