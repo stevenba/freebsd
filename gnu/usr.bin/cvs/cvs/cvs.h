@@ -335,6 +335,8 @@ extern int trace;		/* Show all commands */
 extern int noexec;		/* Don't modify disk anywhere */
 extern int logoff;		/* Don't write history entry */
 
+extern char hostname[];	
+
 /* Externs that are included directly in the CVS sources */
 DBM *open_module PROTO((void));
 FILE *Fopen PROTO((char *name, char *mode));

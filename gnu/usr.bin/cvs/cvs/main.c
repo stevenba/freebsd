@@ -45,6 +45,15 @@ extern char *getenv ();
 char *program_name;
 char *command_name = "";
 
+/*
+ * Since some systems don't define this...
+ */
+#ifndef MAXHOSTNAMELEN
+#define MAXHOSTNAMELEN  256
+#endif
+
+char hostname[MAXHOSTNAMELEN];
+
 int use_editor = TRUE;
 int use_cvsrc = TRUE;
 int cvswrite = !CVSREAD_DFLT;
@@ -417,6 +426,8 @@ main (argc, argv)
 	(void) SIG_register (SIGQUIT, Lock_Cleanup);
 	(void) SIG_register (SIGPIPE, Lock_Cleanup);
 	(void) SIG_register (SIGTERM, Lock_Cleanup);
+
+	gethostname(hostname, sizeof (hostname));
 
 #ifdef HAVE_SETVBUF
 	/*

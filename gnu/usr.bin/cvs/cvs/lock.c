@@ -111,13 +111,6 @@ unlock (repository)
 }
 
 /*
- * Since some systems don't define this...
- */
-#ifndef MAXHOSTNAMELEN
-#define	MAXHOSTNAMELEN	256
-#endif
-
-/*
  * Create a lock file for readers
  */
 int
@@ -127,17 +120,9 @@ Reader_Lock (xrepository)
     int err = 0;
     FILE *fp;
     char tmp[PATH_MAX];
-#ifdef HAVE_LONG_FILE_NAMES
-    char hostname[MAXHOSTNAMELEN];
-#endif
 
     if (noexec)
 	return (0);
-
-#ifdef HAVE_LONG_FILE_NAMES
-    memset(hostname, 0, sizeof(hostname));
-    gethostname(hostname, sizeof(hostname) - 1);
-#endif
 
     /* we only do one directory at a time for read locks! */
     if (repository != NULL)
@@ -287,14 +272,6 @@ write_lock (repository)
     int status;
     FILE *fp;
     char tmp[PATH_MAX];
-#ifdef HAVE_LONG_FILE_NAMES
-    char hostname[MAXHOSTNAMELEN];
-#endif
-
-#ifdef HAVE_LONG_FILE_NAMES
-    memset(hostname, 0, sizeof(hostname));
-    gethostname(hostname, sizeof(hostname) - 1);
-#endif
 
     if (writelock[0] == '\0')
 	(void) sprintf (writelock,

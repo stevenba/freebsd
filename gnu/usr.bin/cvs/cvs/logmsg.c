@@ -13,14 +13,6 @@ static char rcsid[] = "$CVSid: @(#)logmsg.c 1.48 94/09/29 $";
 USE(rcsid)
 #endif
 
-/* this is slightly dangerous, since it could conflict with other systems'
- *  own prototype.  
- */
-#if 0
-/* Which is why I'll nuke this */
-extern int gethostname PROTO((char *name, int len));
-#endif
-
 static int find_type PROTO((Node * p, void *closure));
 static int fmt_proc PROTO((Node * p, void *closure));
 static int logfile_write PROTO((char *repository, char *filter, char *title,
@@ -409,7 +401,7 @@ logfile_write (repository, filter, title, message, revision, logfp, changes)
     FILE *logfp;
     List *changes;
 {
-    char cwd[PATH_MAX], host[MAXHOSTNAMELEN];
+    char cwd[PATH_MAX];
     FILE *pipefp, *Popen ();
     char *prog = xmalloc (MAXPROGLEN);
     char *cp;
@@ -426,10 +418,8 @@ logfile_write (repository, filter, title, message, revision, logfp, changes)
 	free (prog);
 	return (1);
     }
-    if (gethostname (host, sizeof (host)) < 0)
-	(void) strcpy (host, "(unknown)");
     (void) fprintf (pipefp, "Update of %s\n", repository);
-    (void) fprintf (pipefp, "In directory %s:%s\n\n", host,
+    (void) fprintf (pipefp, "In directory %s:%s\n\n", hostname,
 		    ((cp = getwd (cwd)) != NULL) ? cp : cwd);
     if (revision && *revision)
 	(void) fprintf (pipefp, "Revision/Branch: %s\n\n", revision);
