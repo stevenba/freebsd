@@ -1,2 +1,0 @@
-STAND_LINKS="bin sbin usr/bin usr/sbin usr/libexec"
-o_no_devfs=""	# we have devfs
