@@ -505,7 +505,8 @@ datalink_ComeDown(struct datalink *dl, int how)
 }
 
 static int
-datalink_Write(struct fdescriptor *d, struct bundle *bundle, const fd_set *fdset)
+datalink_Write(struct fdescriptor *d, struct bundle *bundle,
+               const fd_set *fdset)
 {
   struct datalink *dl = descriptor2datalink(d);
   int result = 0;
