@@ -1,4 +1,0 @@
-#	$Id$
-
-SHLIB_MAJOR?= 1
-SHLIB_MINOR?= 0
