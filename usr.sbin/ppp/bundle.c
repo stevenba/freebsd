@@ -710,11 +710,10 @@ bundle_Create(const char *prefix, int type, int unit)
         continue;
       }
 #endif
-      err = errno;
-      break;
-    } else if (errno == ENOENT) {
-      if (++enoentcount > 2)
+      if (errno != ENOENT || ++enoentcount > 2) {
+        err = errno;
 	break;
+      }
     } else
       err = errno;
   }
