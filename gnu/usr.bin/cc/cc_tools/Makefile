@@ -11,7 +11,7 @@
 # Prevent mkdep from using it, so that we don't have to give rules for
 # aliases of generated headers.
 
-CFLAGS+=	-I.
+CFLAGS+=	-DGENERATOR_FILE -I.
 
 .include "../Makefile.inc"
 
@@ -20,22 +20,28 @@ CFLAGS+=	-I.
 #-----------------------------------------------------------------------
 # insn-* gunk
 
+CLEANFILES+=	gensupport+%DIKED.c
+gensupport+%DIKED.c: gensupport.c
+	sed \
+	    -e 's/^xmalloc/DONT_xmalloc/g'	\
+	    -e 's/^xrealloc/DONT_xrealloc/g'	\
+	    -e 's/^xstrdup/DONT_xstrdup/g'	\
+	${.ALLSRC} > ${.TARGET}
+
 .for F in attr codes config flags
 insn-$F.h: gen$F ${MD_FILE}
 	./gen$F ${MD_FILE} > insn-$F.h
 GENSRCS+=	insn-$F.h
 .endfor
 
-.for F in attrtab emit extract opinit output peep recog
-insn-$F.c: gen$F ${MD_FILE}
-	./gen$F ${MD_FILE} > insn-$F.c
-GENSRCS+=	insn-$F.c
-.endfor
+GENSRCS+=	gen-time-stamp
+gen-time-stamp: genattrtab genemit genextract genopinit genoutput genpeep genrecog
+	touch ${.TARGET}
 
 .for F in attr codes config emit extract flags opinit output peep recog
 build-tools: gen$F
 
-gen$F: gen$F.o rtl.o obstack.o print-rtl.o bitmap.o
+gen$F: gen$F.o rtl.o obstack.o print-rtl.o bitmap.o errors.o gensupport+%DIKED.o ggc-none.o hashtab.o #safe-ctype.o
 	${CC} -static ${CFLAGS} ${LDFLAGS} -o ${.TARGET} ${.ALLSRC}
 
 GENSRCS+=	gen$F.c
@@ -45,20 +51,20 @@ CLEANFILES+=	gen$F
 .for F in attrtab
 build-tools: gen$F
 
-gen$F: gen$F.o rtl.o rtlanal.o print-rtl.o obstack.o bitmap.o
+gen$F: gen$F.o rtl.o print-rtl.o obstack.o bitmap.o errors.o gensupport+%DIKED.o ggc-none.o hashtab.o
 	${CC} -static ${CFLAGS} ${LDFLAGS} -o ${.TARGET} ${.ALLSRC}
 
 GENSRCS+=	gen$F.c
 CLEANFILES+=	gen$F
 .endfor
 
-SRCS+=		bitmap.c obstack.c print-rtl.c rtl.c rtlanal.c
+SRCS+=		bitmap.c errors.c gensupport+%DIKED.c ggc-none.c hashtab.c obstack.c print-rtl.c regclass.c rtl.c rtlanal.c
 
 .for F in check genrtl
 build-tools: gen$F
 
 gen$F: gen$F.o
-	${CC} -static ${CFLAGS} ${LDFLAGS} -o ${.TARGET} ${.ALLSRC}
+	${CC} -static -DGENERATOR_FILE ${CFLAGS} ${LDFLAGS} -o ${.TARGET} ${.ALLSRC}
 
 GENSRCS+=	gen$F.c
 CLEANFILES+=	gen$F
@@ -66,28 +72,10 @@ CLEANFILES+=	gen$F
 
 .ORDER: genrtl.c genrtl.h
 genrtl.c genrtl.h: gengenrtl
-	./gengenrtl genrtl.h genrtl.c
+	./gengenrtl > genrtl.c
+	./gengenrtl -h > genrtl.h
 
 GENSRCS+=	genrtl.c genrtl.h
-
-#-----------------------------------------------------------------------
-# C hash codes
-c-gperf.h: c-parse.gperf
-	gperf -p -j1 -i 1 -g -o -t -G -N is_reserved_word -k1,3,$$ \
-	    ${GCCDIR}/c-parse.gperf > ${.TARGET}
-GENSRCS+=	c-gperf.h
-
-#-----------------------------------------------------------------------
-# C++ hash codes
-gxx-hash.h: gxx.gperf
-	gperf -p -j1 -g -o -t -N is_reserved_word '-k1,4,7,$$' \
-	    ${GCCDIR}/cp/gxx.gperf >gxx-hash.h
-GENSRCS+=	gxx-hash.h
-
-# make a link the the Cygnus used name for now -- hopes are they will change it
-hash.h: gxx-hash.h
-	ln -sf ${.ALLSRC} ${.TARGET}
-GENSRCS+=	hash.h
 
 #-----------------------------------------------------------------------
 # Common parser stuff.
@@ -99,29 +87,48 @@ GENSRCS+=	tree-check.h
 #-----------------------------------------------------------------------
 # the host/target compiler config.
 
-COMMONHDRS=	config.h hconfig.h multilib.h options.h specs.h tconfig.h tm.h
+COMMONHDRS=	config.h hconfig.h multilib.h options.h specs.h tconfig.h tm.h \
+		tm_p.h configargs.h safe-ctype.h
 GENSRCS+=	${COMMONHDRS} gencheck.h
+
+${COMMONHDRS}: ${.CURDIR}/Makefile
+
+configargs.h:
+	echo 'static const char configuration_arguments[] ='	> ${.TARGET}
+	echo '	"FreeBSD/${GCC_ARCH} system compiler";'		>> ${.TARGET}
+	echo 'static const char thread_model[] = "posix";'	>> ${.TARGET}
 
 config.h hconfig.h:
 	echo '#include "auto-host.h"'			> ${.TARGET}
 	echo '#include "gansidecl.h"'			>> ${.TARGET}
 	echo '#include "${GCC_ARCH}/xm-${GCC_ARCH}.h"'	>> ${.TARGET}
+	echo '#include "defaults.h"'			>> ${.TARGET}
 	echo '#include "hwint.h"'			>> ${.TARGET}
+	echo '#ifndef POSIX'				>> ${.TARGET}
+	echo '# define POSIX'				>> ${.TARGET}
+	echo '#endif'					>> ${.TARGET}
+	echo '#ifndef GENERATOR_FILE'			>> ${.TARGET}
+	echo '#include "insn-codes.h"'			>> ${.TARGET}
+	echo '#include "insn-flags.h"'			>> ${.TARGET}
+	echo '#endif'					>> ${.TARGET}
 
 gencheck.h:
 	echo '#include "cp/cp-tree.def"'		> ${.TARGET}
 	echo '#include "objc/objc-tree.def"'		>> ${.TARGET}
 
 multilib.h:
-	echo 'static char *multilib_raw[] = { \
+	echo 'static const char *const multilib_raw[] = { \
 	    "aout maout;", "elf !maout;", NULL };'	> ${.TARGET}
-	echo 'static char *multilib_matches_raw[] = { \
+	echo 'static const char *const multilib_matches_raw[] = { \
 	    "maout maout;", "melf melf;", NULL };'	>> ${.TARGET}
-	echo 'static char *multilib_extra = "";'	>> ${.TARGET}
+	echo 'static const char *multilib_extra = "";'	>> ${.TARGET}
+	echo 'static const char *const multilib_exclusions_raw[] = { \
+	    NULL };'					>> ${.TARGET}
 
 options.h:
 	echo '#include "cp/lang-options.h"'		> ${.TARGET}
 	echo '#include "f/lang-options.h"'		>> ${.TARGET}
+	echo '#include "objc/lang-options.h"'		>> ${.TARGET}
 
 specs.h:
 	echo '#include "cp/lang-specs.h"'		> ${.TARGET}
@@ -131,15 +138,22 @@ specs.h:
 tconfig.h:
 	echo '#include "gansidecl.h"'			> ${.TARGET}
 	echo '#include "${GCC_ARCH}/xm-${GCC_ARCH}.h"'	>> ${.TARGET}
+	echo '#include "defaults.h"'			>> ${.TARGET}
+	echo '#ifndef GENERATOR_FILE'			>> ${.TARGET}
+	echo '#include "insn-codes.h"'			>> ${.TARGET}
+	echo '#include "insn-flags.h"'			>> ${.TARGET}
+	echo '#endif'					>> ${.TARGET}
+	echo '#define USING_SJLJ_EXCEPTIONS 0'		>> ${.TARGET}
 
-# KEEP THIS IN SYNC with src/gcc/lib/libgcc/Makefile !!
+#	KEEP THIS IN SYNC with src/gcc/lib/libgcc/Makefile !!
 tm.h:
-	echo '#include "${GCC_ARCH}/${GCC_ARCH}.h"'	> ${.TARGET}
+	echo '#include "gansidecl.h"'			> ${.TARGET}
+	echo '#include "${GCC_ARCH}/${GCC_ARCH}.h"'	>> ${.TARGET}
 .if ${GCC_ARCH} == "i386"
 	echo '#include "${GCC_ARCH}/att.h"'		>> ${.TARGET}
 .endif
+	echo '#include <freebsd-native.h>'		>> ${.TARGET}
 	echo '#include <freebsd.h>'			>> ${.TARGET}
-	echo '#include "dbxelf.h"'			>> ${.TARGET}
 .if exists(${GCCDIR}/config/${GCC_ARCH}/elf.h)
 	echo '#include "${GCC_ARCH}/elf.h"'		>> ${.TARGET}
 .endif
@@ -147,7 +161,19 @@ tm.h:
 .if ${GCC_ARCH} == "i386"
 	echo '#include "${GCC_ARCH}/perform.h"'		>> ${.TARGET}
 .endif
+	echo '#include "defaults.h"'			>> ${.TARGET}
+	echo '#ifndef GENERATOR_FILE'			>> ${.TARGET}
+	echo '#include "insn-codes.h"'			>> ${.TARGET}
+	echo '#include "insn-flags.h"'			>> ${.TARGET}
+	echo '#endif'					>> ${.TARGET}
+
+tm_p.h:
+	echo '#include "${GCC_ARCH}/${GCC_ARCH}-protos.h"' > ${.TARGET}
 	echo '#include <freebsd-native.h>'		>> ${.TARGET}
+	echo '#ifndef GENERATOR_FILE'			>> ${.TARGET}
+	echo '#include "insn-codes.h"'			>> ${.TARGET}
+	echo '#include "insn-flags.h"'			>> ${.TARGET}
+	echo '#endif'					>> ${.TARGET}
 
 #-----------------------------------------------------------------------
 # General things.
@@ -156,8 +182,6 @@ SRCS+=		${GENSRCS}
 CLEANFILES+=	${GENSRCS}
 
 all: ${SRCS}
-
-build-tools: depend
 
 .include <bsd.prog.mk>
 
@@ -176,7 +200,7 @@ OBJS+=		${SRCS:N*.h:R:S/$/.o/g}
 # all headers.  Filter out the objects that would cause problems (i.e.,
 # objects that will be used to create programs that will generate headers).
 #
-${OBJS:Nbitmap.o:Ngenattr.o:Ngencheck.o:Ngencodes.o:Ngenconfig.o:Ngenflags.o:Ngengenrtl.o:Nobstack.o:Nprint-rtl.o:Nrtl.o}: ${SRCS:M*.h}
+${OBJS:Nbitmap.o:Nerrors.o:Ngenattr.o:Ngencheck.o:Ngencodes.o:Ngenconfig.o:Ngenflags.o:Ngengenrtl.o:Ngensupport+%DIKED.o:Nggc-none.o:Nhashtab.o:Nobstack.o:Nprint-rtl.o:Nrtl.o}: ${SRCS:M*.h}
 
 # Next, make each of the problematic objects depend on only most headers.
 # Filter out the headers that would cause problems (and a few more when it
@@ -187,3 +211,16 @@ bitmap.o genattr.o gencodes.o genconfig.o genflags.o obstack.o print-rtl.o \
 gencheck.o: gencheck.h ${SRCS:M*.h:Ngenrtl.h:Ntree-check.h:Ninsn-*.h}
 gengenrtl.o: ${SRCS:M*.h:Ngenrtl.h:Ninsn-*.h}
 .endif
+
+#GENSRCS+=	safe-ctype.h
+${OBJS} gensupport+%DIKED.o: safe-ctype.h
+safe-ctype.h: Makefile
+	echo '#include <ctype.h>'	> ${.TARGET}
+.for Z in TOUPPER TOLOWER ISDIGIT ISXDIGIT ISUPPER ISLOWER ISALPHA ISALNUM ISSPACE ISPUNCT ISGRAPH ISBLANK ISPRINT ISCNTRL
+	echo '#define	${Z}	${Z:L}'	>> ${.TARGET}
+.endfor
+	echo "#define	ISIDST(x)	((x) == '_' || isalpha(x))"	>> ${.TARGET}
+	echo "#define	ISIDNUM(x)	(isdigit(x) || ISIDST(x))"	>> ${.TARGET}
+	echo "#define	IS_VSPACE(x)	((x) == '\n' || (x) == '\r')"	>> ${.TARGET}
+	echo "#define	IS_NVSPACE(x)	(!IS_VSPACE(x) && (isspace(x) || (x) == '\0'))"	>> ${.TARGET}
+	echo "#define	IS_SPACE_OR_NUL(x)	(isspace(x) || (x) == '\0')"	>> ${.TARGET}

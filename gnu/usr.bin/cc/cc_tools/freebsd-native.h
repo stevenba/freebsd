@@ -7,6 +7,9 @@
 #undef  FREEBSD_NATIVE
 #define FREEBSD_NATIVE 1
 
+/* Fake out gcc/config/freebsd<version>.h.  */
+#define	FBSD_MAJOR 5
+
 #undef SYSTEM_INCLUDE_DIR		/* We don't need one for now. */
 #undef GCC_INCLUDE_DIR			/* We don't need one for now. */
 #undef TOOL_INCLUDE_DIR			/* We don't need one for now. */
@@ -49,3 +52,18 @@
 
 /* FreeBSD is 4.4BSD derived */
 #define bsd4_4
+
+/* Dike out [stupid, IMHO] libiberty functions.  */
+#define	xmalloc_set_program_name(dummy)
+#define	xmalloc		malloc
+#define	xcalloc		calloc
+#define	xrealloc	realloc
+#define	xstrdup		strdup
+#define	xstrerror	strerror
+
+/* And now they want to replace ctype.h.... grr... [stupid, IMHO] */
+#define xxxISDIGIT	isdigit
+#define xxxISGRAPH	isgraph
+#define xxxISLOWER	islower
+#define xxxISSPACE	isspace
+#define xxxTOUPPER	toupper
