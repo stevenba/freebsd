@@ -5,11 +5,14 @@
 .PATH: ${GCCDIR}
 
 PROG=	c++filt
-SRCS=	cplus-dem.c getopt.c getopt1.c underscore.c
+SRCS=	cp-demangle.c cplus-dem+%DIKED.c getopt.c getopt1.c underscore.c
 BINDIR=	/usr/libexec/${OBJFORMAT}
 NOMAN=	1
 
 CFLAGS+= -DMAIN -DIN_GCC -DVERSION=\"$(version)\"
+
+DPADD+=	${LIBCC_INT}
+LDADD+=	${LIBCC_INT}
 
 CLEANFILES= tmp-dum.c tmp-dum.s underscore.c
 
@@ -23,5 +26,11 @@ underscore.c:
 	  echo "int prepends_underscore = 0;" >>underscore.c; \
 	fi
 	rm -f tmp-dum.c tmp-dum.s
+
+cplus-dem+%DIKED.c: cplus-dem.c
+	sed \
+	    -e 's/^xmalloc[ 	]/_DONT_xmalloc /g' \
+	    -e 's/^xrealloc[ 	]/_DONT_xrealloc /g' \
+	    ${.ALLSRC} > ${.TARGET}
 
 .include <bsd.prog.mk>
