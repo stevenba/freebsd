@@ -1,5 +1,5 @@
 /*
- * $Id$
+ * $Id: label.c,v 1.23.2.1 1994/11/21 03:12:01 phk Exp $
  */
 
 #include <stdlib.h>
@@ -84,8 +84,9 @@ DiskLabel()
 	ourpart_size = lbl->d_partitions[OURPART].p_size;
 	ourpart_offset = lbl->d_partitions[OURPART].p_offset;
 
-        mvprintw(j++, 0, "Part  Start       End    Blocks     MB  Type    Action   Mountpoint");
+        mvprintw(j++, 0, "Part  Start       End    Blocks     MB  Type    Action  Mountpoint");
 	for (i = 0; i < MAXPARTITIONS; i++) {
+	    refresh();
 	    mvprintw(j++, 0, "%c ", 'a'+i);
 	    printw(" %8u  %8u  %8u  %5u  ",
 		   lbl->d_partitions[i].p_offset,
@@ -100,12 +101,15 @@ DiskLabel()
 		printw("%04x   ", k);
 	    else
 		printw("%-7.7s ", fstypenames[k]);
-	    if(!strcmp(Ftype[MP[diskno][i]],"swap"))
-		printw("swap   ");
+
+	    if(!MP[diskno][i])
+		printw("        ");
+	    else if(!strcmp(Ftype[MP[diskno][i]],"swap"))
+		printw("swap    ");
 	    else if(Faction[MP[diskno][i]]) 
-		printw("newfs  ");
+		printw("newfs   ");
 	    else
-		printw("mount  ");
+		printw("mount   ");
 	    if (i == OURPART)
 		printw("<Entire FreeBSD slice>");
 	    else if (i == RAWPART)
