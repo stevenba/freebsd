@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/sh -x
 :
 #
 # Copyright (c) 1992, Brian Berliner
@@ -11,7 +11,7 @@
 # This script should be run once to help you setup your site for CVS.
 
 # this line is edited by Makefile when creating cvsinit.inst
-CVSLIB="xLIBDIRx"
+CVSLIB="/usr/src/gnu/usr.bin/cvs"
 
 # Make sure that the CVSROOT variable is set
 if [ "x$CVSROOT" = x ]; then
@@ -157,7 +157,7 @@ else
 	echo "Making a simple one for you..."
 	# try to find perl; use fancy log script if we can
 	for perlpath in `echo $PATH | sed -e 's/:/ /g'` x; do
-	    if [ -f $perlpath/perl ]; then
+	    if [ -f $perlpath/perl -a -r $CVSLIB/contrib/log.pl ]; then
 		echo "#!$perlpath/perl" > $CVSROOT/CVSROOT/log.pl
 		cat $CVSLIB/contrib/log.pl >> $CVSROOT/CVSROOT/log.pl
 		chmod 755 $CVSROOT/CVSROOT/log.pl
@@ -165,7 +165,7 @@ else
 		break
 	    fi
 	done
-	if [ $perlpath = x ]; then
+	if [ $perlpath = x -o ! -r $CVSLIB/contrib/log.pl ]; then
 	    # we did not find perl anywhere, so make a simple loginfo file
 	    cat > $CVSROOT/CVSROOT/loginfo <<"HERE"
 #
@@ -208,12 +208,14 @@ for info in commitinfo rcsinfo editinfo; do
 	    echo "You have a $CVSROOT/CVSROOT/$info file,"
 	    echo "But no $CVSROOT/CVSROOT/${info},v file."
 	    echo "I'll create one for you, but otherwise leave it alone..."
+	    (cd $CVSROOT/CVSROOT; ci -q -u -t/dev/null -m"initial checkin of $info" $info)
 	else
 	    echo "The $CVSROOT/CVSROOT/$info file does not exist."
-	    echo "Making a simple one for you..."
-	    sed -e 's/^\([^#]\)/#\1/' $CVSLIB/examples/$info > $CVSROOT/CVSROOT/$info
+	    if [ -r $CVSLIB/examples/$info ]; then
+	        echo "Making a simple one for you..."
+	        sed -e 's/^\([^#]\)/#\1/' $CVSLIB/examples/$info > $CVSROOT/CVSROOT/$info
+	    fi
 	fi
-	(cd $CVSROOT/CVSROOT; ci -q -u -t/dev/null -m"initial checkin of $info" $info)
 	echo ""
     fi
 done
