@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
- *	$Id: sio.c,v 1.147.2.7 1997/02/01 16:19:05 bde Exp $
+ *	$Id: sio.c,v 1.147.2.8 1997/05/11 12:57:38 bde Exp $
  */
 
 #include "opt_comconsole.h"
@@ -61,6 +61,7 @@
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/syslog.h>
+#include <sys/sysctl.h>
 #ifdef DEVFS
 #include <sys/devfsext.h>
 #endif
@@ -104,9 +105,13 @@
 #define	COM_NOTAST4(dev)	((dev)->id_flags & 0x04)
 #endif /* COM_MULTIPORT */
 
+#define	COM_CONSOLE(dev)	((dev)->id_flags & 0x10)
+#define	COM_FORCECONSOLE(dev)	((dev)->id_flags & 0x20)
+#define	COM_LLCONSOLE(dev)	((dev)->id_flags & 0x40)
 #define	COM_LOSESOUTINTS(dev)	((dev)->id_flags & 0x08)
 #define	COM_NOFIFO(dev)		((dev)->id_flags & 0x02)
 #define	COM_VERBOSE(dev)	((dev)->id_flags & 0x80)
+#define	COM_BAUD_MULTIPLE(dev)	((((dev)->id_flags >> 20) & 0x0F) + 1)
 
 #define	com_scr		7	/* scratch register for 16450-16550 (R/W) */
 
@@ -195,6 +200,7 @@ struct com_s {
 	int	unit;		/* unit	number */
 	int	dtr_wait;	/* time to hold DTR down on close (* 1/hz) */
 	u_int	tx_fifo_size;
+	u_int	baud_multiple;	/* chip has been supercharged by multiple X */
 	u_int	wopeners;	/* # processes waiting for DCD in open() */
 
 	/*
@@ -331,6 +337,8 @@ static struct cdevsw sio_cdevsw = {
 };
 
 static	int	comconsole = -1;
+static	Port_t	siocniobase;
+	int	siocn_baud_multiple = 1; /* set from vendor startup code */
 static	speed_t	comdefaultrate = CONSPEED;
 static	u_int	com_events;	/* input chars + weighted output completions */
 static	int	sio_timeout;
@@ -342,33 +350,73 @@ static struct tty	sio_tty[NSIO];
 #endif
 static	const int	nsio_tty = NSIO;
 
-static	struct speedtab comspeedtab[] = {
-	{ 0,		0 },
-	{ 50,		COMBRD(50) },
-	{ 75,		COMBRD(75) },
-	{ 110,		COMBRD(110) },
-	{ 134,		COMBRD(134) },
-	{ 150,		COMBRD(150) },
-	{ 200,		COMBRD(200) },
-	{ 300,		COMBRD(300) },
-	{ 600,		COMBRD(600) },
-	{ 1200,		COMBRD(1200) },
-	{ 1800,		COMBRD(1800) },
-	{ 2400,		COMBRD(2400) },
-	{ 4800,		COMBRD(4800) },
-	{ 9600,		COMBRD(9600) },
-	{ 19200,	COMBRD(19200) },
-	{ 38400,	COMBRD(38400) },
-	{ 57600,	COMBRD(57600) },
-	{ 115200,	COMBRD(115200) },
-	{ -1,		-1 }
-};
-
 #ifdef COM_ESP
 /* XXX configure this properly. */
 static	Port_t	likely_com_ports[] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8, };
 static	Port_t	likely_esp_ports[] = { 0x140, 0x180, 0x280, 0 };
 #endif
+
+/*
+ * handle sysctl read/write requests for console speed
+ * 
+ * In addition to setting comdefaultrate for I/O through /dev/console,
+ * also set the initial and lock values for the /dev/ttyXX device
+ * if there is one associated with the console.  Finally, if the /dev/tty
+ * device has already been open, change the speed on the open running port
+ * itself.
+ */
+
+static int
+sysctl_machdep_comdefaultrate SYSCTL_HANDLER_ARGS
+{
+	int error, s;
+	speed_t newspeed;
+	struct com_s *com;
+	struct tty *tp;
+
+	newspeed = comdefaultrate;
+
+	error = sysctl_handle_opaque(oidp, &newspeed, sizeof newspeed, req);
+	if (error || !req->newptr)
+		return (error);
+
+	comdefaultrate = newspeed;
+
+	if (comconsole < 0)		/* serial console not selected? */
+		return (0);
+
+	com = com_addr(comconsole);
+	if (!com)
+		return (ENXIO);
+
+	/*
+	 * set the initial and lock rates for /dev/ttydXX and /dev/cuaXX
+	 * (note, the lock rates really are boolean -- if non-zero, disallow
+	 *  speed changes)
+	 * XXX for now don't do the lock speeds  [JRE]
+	 */
+	com->lt_in.c_ispeed  = com->lt_in.c_ospeed =
+	com->lt_out.c_ispeed = com->lt_out.c_ospeed = 0;
+	com->it_in.c_ispeed  = com->it_in.c_ospeed =
+	com->it_out.c_ispeed = com->it_out.c_ospeed =
+	comdefaultrate;
+
+	/*
+	 * if we're open, change the running rate too
+	 */
+	tp = com->tp;
+	if (tp && (tp->t_state & TS_ISOPEN)) {
+		tp->t_termios.c_ispeed =
+		tp->t_termios.c_ospeed = comdefaultrate;
+		s = spltty();
+		error = comparam(tp, &tp->t_termios);
+		splx(s);
+	}
+	return error;
+}
+
+SYSCTL_PROC(_machdep, OID_AUTO, conspeed, CTLTYPE_INT | CTLFLAG_RW,
+	    0, 0, sysctl_machdep_comdefaultrate, "I", "");
 
 #if NCRD > 0
 /*
@@ -572,11 +620,15 @@ sioprobe(dev)
 	 * XXX what about the UART bug avoided by waiting in comparam()?
 	 * We don't want to to wait long enough to drain at 2 bps.
 	 */
-	outb(iobase + com_cfcr, CFCR_DLAB | CFCR_8BITS);
-	outb(iobase + com_dlbl, COMBRD(9600) & 0xff);
-	outb(iobase + com_dlbh, (u_int) COMBRD(9600) >> 8);
-	outb(iobase + com_cfcr, CFCR_8BITS);
-	DELAY((16 + 1) * 1000000 / (9600 / 10));
+	if (iobase == siocniobase)
+		DELAY((16 + 1) * 1000000 / (comdefaultrate / 10));
+	else {
+		outb(iobase + com_cfcr, CFCR_DLAB | CFCR_8BITS);
+		outb(iobase + com_dlbl, COMBRD(9600) & 0xff);
+		outb(iobase + com_dlbh, (u_int) COMBRD(9600) >> 8);
+		outb(iobase + com_cfcr, CFCR_8BITS);
+		DELAY((16 + 1) * 1000000 / (9600 / 10));
+	}
 
 	/*
 	 * Enable the interrupt gate and disable device interupts.  This
@@ -810,9 +862,18 @@ sioattach(isdp)
 		com->it_in.c_cflag = TTYDEF_CFLAG | CLOCAL;
 		com->it_in.c_lflag = TTYDEF_LFLAG;
 		com->lt_out.c_cflag = com->lt_in.c_cflag = CLOCAL;
+		/*
+		 * The initial rates equal the console rate
+		 * but the value is not locked
+		 */
+		com->lt_out.c_ispeed = com->lt_out.c_ospeed =
+		com->lt_in.c_ispeed = com->lt_in.c_ospeed = 0;
 		com->it_in.c_ispeed = com->it_in.c_ospeed = comdefaultrate;
-	} else
+		com->baud_multiple = siocn_baud_multiple;
+	} else {
+		com->baud_multiple = COM_BAUD_MULTIPLE(isdp);
 		com->it_in.c_ispeed = com->it_in.c_ospeed = TTYDEF_SPEED;
+	}
 	termioschars(&com->it_in);
 	com->it_out = com->it_in;
 
@@ -938,6 +999,8 @@ determined_type: ;
 					  COM_MPMASTER(isdp))->id_irq == 0;
 	 }
 #endif /* COM_MULTIPORT */
+	if (unit == comconsole)
+		printf(", console");
 	printf("\n");
 
 	s = spltty();
@@ -1868,6 +1931,51 @@ repeat:
 		goto repeat;
 }
 
+/* 
+ * given the xtal speed, and a multiple and a speed,
+ * work out the nearest clock-dividor, or return an error
+ * if there isn't one within about 4% of the required speed.
+ * returns the speed adjusted to the correct nearest value as well.
+ * Probably needs less magic numbers.
+ */
+static int
+makedivisor( speed_t *speed, int *divisorp, int baud_multiple)
+{
+	int check, divisor;
+
+	if (*speed == 0) {
+		divisor = 0;
+	} else {
+		/*
+		 * Calculate the divisor. 
+		 * Make it 2 x and then use rounding, rather than use
+		 * a direct truncation, after all, the correct
+		 * divisor might be 0.001 higher.
+		 */
+		divisor = (baud_multiple * 115200 * 2) / (*speed);
+
+		divisor = (divisor + 1) >> 1; /* round up or down */
+		/*
+		 * the specs usually say that a speed
+		 * must be (+ or -) 5%
+		 * to be acceptable. We'll use 4%.
+		 */
+		check = (100 * divisor * (*speed))
+			/(baud_multiple * 115200);
+		if ((check < 96) || (check > 104)) {
+			return (EINVAL); /* not close enough */
+		}
+
+		/*
+		 * Make the reported speed show what we
+		 * are actually doing.
+		 */
+		*speed = (baud_multiple * 115200)/divisor;
+	}
+	*divisorp = divisor;
+	return (0);
+}
+
 static int
 comparam(tp, t)
 	struct tty	*tp;
@@ -1885,19 +1993,28 @@ comparam(tp, t)
 	int		unit;
 	int		txtimeout;
 
+	unit = DEV_TO_UNIT(tp->t_dev);
+	com = com_addr(unit);
+	iobase = com->iobase;
+
 	/* do historical conversions */
 	if (t->c_ispeed == 0)
 		t->c_ispeed = t->c_ospeed;
 
 	/* check requested parameters */
-	divisor = ttspeedtab(t->c_ospeed, comspeedtab);
-	if (divisor < 0 || divisor > 0 && t->c_ispeed != t->c_ospeed)
+	if(com->baud_multiple == 0) { /* catch 0 as well */
+		com->baud_multiple = 1;
+		printf("sio%d: warning, baud multiple was 0\n", unit); 
+	}
+	error = makedivisor( &(t->c_ospeed), &divisor , com->baud_multiple);
+	if (error)
+		return error;
+	t->c_ispeed = t->c_ospeed;
+	if (divisor < 0 || divisor > 0 && t->c_ispeed != t->c_ospeed) {
 		return (EINVAL);
+	}
 
 	/* parameters are OK, convert them to the com struct and the device */
-	unit = DEV_TO_UNIT(tp->t_dev);
-	com = com_addr(unit);
-	iobase = com->iobase;
 	s = spltty();
 	if (divisor == 0)
 		(void)commctl(com, TIOCM_DTR, DMBIC);	/* hang up line */
@@ -2394,7 +2511,6 @@ struct siocnstate {
 	u_char	mcr;
 };
 
-static	Port_t	siocniobase;
 
 static void siocnclose	__P((struct siocnstate *sp));
 static void siocnopen	__P((struct siocnstate *sp));
@@ -2444,7 +2560,7 @@ siocnopen(sp)
 	 * data input register.  This also reduces the effects of the
 	 * UMC8669F bug.
 	 */
-	divisor = ttspeedtab(comdefaultrate, comspeedtab);
+	makedivisor( &comdefaultrate, &divisor , siocn_baud_multiple);
 	dlbl = divisor & 0xFF;
 	if (sp->dlbl != dlbl)
 		outb(iobase + com_dlbl, dlbl);
@@ -2489,21 +2605,42 @@ void
 siocnprobe(cp)
 	struct consdev	*cp;
 {
-	int	unit;
+	struct isa_device	*dvp;
+	int			s;
+	struct siocnstate	sp;
 
-	/* XXX: ick */
-	unit = DEV_TO_UNIT(CONUNIT);
-	siocniobase = CONADDR;
-
-	/* make sure hardware exists?  XXX */
-
-	/* initialize required fields */
-	cp->cn_dev = makedev(CDEV_MAJOR, unit);
-#ifdef COMCONSOLE
-	cp->cn_pri = CN_REMOTE;		/* Force a serial port console */
-#else
-	cp->cn_pri = (boothowto & RB_SERIAL) ? CN_REMOTE : CN_NORMAL;
-#endif
+	/*
+	 * Find our first enabled console, if any.  If it is a high-level
+	 * console device, then initialize it and return successfully.
+	 * If it is a low-level console device, then initialize it and
+	 * return unsuccessfully.  It must be initialized in both cases
+	 * for early use by console drivers and debuggers.  Initializing
+	 * the hardware is not necessary in all cases, since the i/o
+	 * routines initialize it on the fly, but it is necessary if
+	 * input might arrive while the hardware is switched back to an
+	 * uninitialized state.  We can't handle multiple console devices
+	 * yet because our low-level routines don't take a device arg.
+	 * We trust the user to set the console flags properly so that we
+	 * don't need to probe.
+	 */
+	cp->cn_pri = CN_DEAD;
+	for (dvp = isa_devtab_tty; dvp->id_driver != NULL; dvp++)
+		if ((dvp->id_driver == &siodriver)
+		&& (dvp->id_enabled)
+		&& (COM_CONSOLE(dvp))) {
+			siocniobase = dvp->id_iobase;
+			siocn_baud_multiple = COM_BAUD_MULTIPLE(dvp);
+			s = spltty();
+			siocnopen(&sp);
+			splx(s);
+			if (!COM_LLCONSOLE(dvp)) {
+				cp->cn_dev = makedev(CDEV_MAJOR, dvp->id_unit);
+				cp->cn_pri = COM_FORCECONSOLE(dvp)
+					     || boothowto & RB_SERIAL
+					     ? CN_REMOTE : CN_NORMAL;
+			}
+			break;
+		}
 }
 
 void
