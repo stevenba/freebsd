@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, [92/04/03  16:51:14  rvb]
- *	$Id: boot.c,v 1.56.2.5 1996/09/08 04:30:05 julian Exp $
+ *	$Id: boot.c,v 1.56.2.6 1996/09/10 23:59:42 julian Exp $
  */
 
 
@@ -217,7 +217,7 @@ loadstart:
 				name = ptr;
 				while ((c = *++ptr) != '\0') {
 					if ( c == ' ') {
-						ptr[-1] = 0;
+						*ptr = '\0';
 						break;
 					}
 				}
