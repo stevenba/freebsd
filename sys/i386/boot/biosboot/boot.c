@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, [92/04/03  16:51:14  rvb]
- *	$Id: boot.c,v 1.56.2.3 1996/09/08 01:17:24 julian Exp $
+ *	$Id: boot.c,v 1.56.2.4 1996/09/08 03:17:47 julian Exp $
  */
 
 
@@ -139,16 +139,7 @@ boot(int drive)
 #endif	/*NAMEBLOCK*/
 loadstart:
 	name = dflname;
-#if 1	/* don't call strcpy, it's not loaded normally */
-	{
-		char *a = name;
-		char *b = namebuf;
-
-		while (*b++ = *a++);
-	}
-#else	/* if we could be sure that the names were < 64 bytes this is SMALL*/
-	bcopy(name,namebuf,64);
-#endif
+	bcopy(name,namebuf,128); /* really want strcpy but why bloat? */
 	/* print this all each time.. (saves space to do so) */
 	/* If we have looped, use the previous entries as defaults */
 	printf("\n>> FreeBSD BOOT @ 0x%x: %d/%d k of memory\n"
