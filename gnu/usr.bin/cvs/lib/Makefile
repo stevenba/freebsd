@@ -7,8 +7,6 @@ SRCS =	argmatch.c error.c getopt.c sighandle.c strippath.c stripslash.c yesno.c 
 
 CLEANFILES+= getdate.c y.tab.h
 
-NOPROFILE= yes
-
 install:
 	@echo -n
 

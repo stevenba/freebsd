@@ -52,6 +52,11 @@
 #       ttyd*   dialin ports
 #       cua*    dialout ports
 #       tty*    hardwired terminals
+#	com*	standard PC COM ports (really makes tty* entries for com)
+#		Note that the `com' driver is not configured in the 
+#		supplied kernels and is usually not what you want.  In
+#		a future release it may be completely desupported.  Fair
+#		warning.
 #
 # Pseudo terminals:
 #	pty*	set of 16 master and slave pseudo terminals
@@ -59,19 +64,19 @@
 #
 # Printers:
 #	lpt*	stock lp
+#	lpa*	interruptless lp
 #
 # Call units:
 #
 # Special purpose devices:
 #	bpf*	packet filter
+#	dcf*	dcf clock
 #	speaker	pc speaker
 #	tw*	xten power controller
 #	snd*	various sound cards
 #	pcaudio PCM audio driver 
-#	socksys iBCS2 socket system driver
-#	vat	VAT compatibility audio driver (requires snd*)
 #
-#	$Id: MAKEDEV,v 1.46 1994/11/01 01:47:08 pst Exp $
+#	$Id: MAKEDEV,v 1.36 1994/05/30 03:53:01 ache Exp $
 #
 
 PATH=/sbin:/bin/:/usr/bin:/usr/sbin:
@@ -82,17 +87,14 @@ case $i in
 
 all)
 	sh MAKEDEV std						# standard
-	sh MAKEDEV wd0 wd1 wd2 wd3 fd0 fd1 sd0 sd1 sd2 sd3 	# bdev, disk
-	sh MAKEDEV cd0 mcd0					# bdev, cdrom
-	sh MAKEDEV ft0 wt0 st0 					# bdev, tape
+	sh MAKEDEV wd0 wd1 fd0 fd1 ft0 wt0 sd0 sd1 st0 cd0 mcd0	# bdev
 	sh MAKEDEV pty0 tty0 tty1 pc0 lpt0 lpt1 lpt2            # cdev
-	sh MAKEDEV ch0 tw0 bpf0 				# cdev
+	sh MAKEDEV ch0 tw0 bpf0 dcf0 lpa0 lpa1 lpa2		# cdev
 	sh MAKEDEV speaker pcaudio psm0 mse0 ttyd2 ttyd3        # cdev
 	sh MAKEDEV vty4						# cdev
 	;;
 std)
 	rm -f console drum mem kmem null zero io tty klog stdin stdout stderr
-	rm -f lkm
 	mknod console	c 0 0;	chmod 600 console;	chown root.wheel console
 	mknod drum	c 4 0;	chmod 640 drum;		chown root.kmem drum
 	mknod kmem	c 2 1;	chmod 640 kmem;		chown root.kmem kmem
@@ -105,7 +107,6 @@ std)
 	mknod stdin	c 22 0; chmod 666 stdin;	chown root.wheel stdin
 	mknod stdout	c 22 1; chmod 666 stdout;	chown root.wheel stdout
 	mknod stderr	c 22 2; chmod 666 stderr;	chown root.wheel stderr
-	mknod lkm	c 32 0;	chmod 644 lkm;		chown root.wheel lkm
 	rm -f fd/*
 	mkdir fd > null 2>&1
 	(cd fd && eval `echo "" | awk ' BEGIN { \
@@ -303,6 +304,12 @@ uk*)
 	mknod uk$unit c 27 $unit
 	;;
 
+com*)
+	unit=`expr $i : '...\(.*\)'`
+	rm -f tty0$unit
+	mknod tty0$unit c 8 $unit
+	;;
+
 pty*)
 	class=`expr $i : 'pty\(.*\)'`
 	case $class in
@@ -411,10 +418,7 @@ cd*|mcd*)
 lpt*)
 	unit=`expr $i : 'lpt\(.*\)'`
 	rm -f lpt$unit
-	rm -f lpctl$unit
 	mknod lpt$unit c 16 $unit
-	mknod lpctl$unit c 16 `expr $unit + 128`
-	chown root.wheel lpt$unit
 	chown root.wheel lpt$unit
 	;;
 
@@ -456,6 +460,22 @@ bpf*)
 	rm -f bpf$unit
 	mknod bpf$unit c 23 $unit
 	chown root.wheel bpf$unit
+	;;
+
+dcf*)
+	unit=`expr $i : 'dcf\(.*\)'`
+	rm -f dcf$unit
+	mknod dcf$unit c 24 $unit
+	chown root.wheel dcf$unit
+	;;
+
+lpa*)
+	unit=`expr $i : 'lpa\(.*\)'`
+	chr=25
+	rm -f lpa$unit lpa${unit}p
+	mknod lpa${unit}	c $chr `expr $unit + 0`
+	mknod lpa${unit}p	c $chr `expr $unit + 32`
+	chown root.wheel lpa${unit} lpa${unit}p
 	;;
 
 speaker)
@@ -536,14 +556,6 @@ pcaudio)
 	chmod 666 pcaudio pcaudioctl
 	;;
 
-socksys)
-	rm -f socksys nfsd spx
-	mknod socksys c 41 0
-	mknod spx c 41 1
-	ln -s /dev/socksys /dev/nfsd
-	chown root.wheel socksys nfsd spx
-	chmod 666 socksys nfsd spx
-	;;
 
 snd*)
 	chr=30
@@ -585,20 +597,6 @@ snd*)
 	rm -f audio1	# Sparc Audio 1 [ SB emulation of PAS16 or 2nd audio ]
 	mknod audio1	c $chr 20
 	chmod 666 audio1
-	;;
-
-vat)
-	rm -f vatio
-	mknod vatio c 25 128
-	chown root.wheel vatio
-	chmod 660 vatio
-	;;
-
-apm)
-	rm -f apm
-	mknod apm c 39 0
-	chown root.wheel apm
-	chmod 660 apm
 	;;
 
 local)

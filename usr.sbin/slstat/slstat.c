@@ -22,7 +22,7 @@
  */
 
 #ifndef lint
-static char rcsid[] = "$Id: slstat.c,v 1.1.1.1 1994/06/17 06:42:39 rich Exp $";
+static char rcsid[] = "$Id: slstat.c,v 1.1 1993/11/16 04:16:48 brezak Exp $";
 #endif
 
 #include <stdio.h>
@@ -32,7 +32,6 @@ static char rcsid[] = "$Id: slstat.c,v 1.1.1.1 1994/06/17 06:42:39 rich Exp $";
 
 #define INET
 
-#include <limits.h>
 #include <sys/param.h>
 #include <sys/mbuf.h>
 #include <sys/types.h>
@@ -52,13 +51,12 @@ static char rcsid[] = "$Id: slstat.c,v 1.1.1.1 1994/06/17 06:42:39 rich Exp $";
 struct nlist nl[] = {
 #define N_SOFTC 0
 	{ "_sl_softc" },
-	{ 0 }
+	"",
 };
 
-const char	*system = NULL;
+char	*system = _PATH_UNIX;
 char	*kmemf = NULL;
 
-kvm_t	*kvm_h;
 int	kflag;
 int	rflag;
 int	vflag;
@@ -73,10 +71,6 @@ main(argc, argv)
 	char *argv[];
 {
 	int c;
-	char errbuf[_POSIX2_LINE_MAX];
-
-	system = getbootfile();
-
 	--argc; ++argv;
 	while (argc > 0) {
 		if (strcmp(argv[0], "-v") == 0) {
@@ -116,14 +110,13 @@ main(argc, argv)
 			kflag++;
 		}
 	}
-	kvm_h = kvm_openfiles(system, kmemf, NULL, O_RDONLY, errbuf);
-	if (kvm_h == 0) {
+	if (kvm_openfiles(system, kmemf, NULL) < 0) {
 		(void)fprintf(stderr,
 		    "slstat: kvm_openfiles(%s,%s,0): %s\n",
-			      system, kmemf, errbuf);
+			      system, kmemf, kvm_geterr());
 		exit(1);
 	}
-	if ((c = kvm_nlist(kvm_h, nl)) != 0) {
+	if ((c = kvm_nlist(nl)) != 0) {
 		if (c > 0) {
 			(void)fprintf(stderr,
 			    "slstat: undefined symbols in %s:", system);
@@ -133,15 +126,14 @@ main(argc, argv)
 			(void)fputc('\n', stderr);
 		} else
 			(void)fprintf(stderr, "slstat: kvm_nlist: %s\n",
-			    kvm_geterr(kvm_h));
+			    kvm_geterr());
 		exit(1);
 	}
 	intpr();
 	exit(0);
 }
 
-#define V(offset) ((line % 20)? ((sc->offset - osc->offset) / \
-		  (rflag ? interval : 1)) : sc->offset)
+#define V(offset) ((line % 20)? ((sc->offset - osc->offset)  / (rflag ? interval : 1)) : sc->offset)
 #define AMT (sizeof(*sc) - 2 * sizeof(sc->sc_comp.tstate))
 
 usage()
@@ -175,7 +167,7 @@ intpr()
 	bzero((char *)osc, AMT);
 
 	while (1) {
-		if (kvm_read(kvm_h, addr, (char *)sc, AMT) < 0)
+		if (kread(addr, (char *)sc, AMT) < 0)
 			perror("kmem read");
 		(void)signal(SIGALRM, catchalarm);
 		signalled = 0;
@@ -195,7 +187,7 @@ intpr()
 			putchar('\n');
 		}
 		printf("%8u %6d %6u %6u %6u",
-		        V(sc_if.if_ibytes),
+		        V(sc_bytesrcvd),
 			V(sc_if.if_ipackets),
 			V(sc_comp.sls_compressedin),
 			V(sc_comp.sls_uncompressedin),
@@ -209,7 +201,7 @@ intpr()
 				  V(sc_comp.sls_errorin),
 			       V(sc_if.if_ierrors));
 		printf(" | %8u %6d %6u %6u %6u",
-			V(sc_if.if_obytes) / (rflag ? interval : 1),
+			V(sc_bytessent) / (rflag ? interval : 1),
 			V(sc_if.if_opackets),
 			V(sc_comp.sls_compressed),
 			V(sc_comp.sls_packets) - V(sc_comp.sls_compressed),
@@ -243,8 +235,6 @@ catchalarm()
 {
 	signalled = 1;
 }
-
-#if 0
 
 #include <kvm.h>
 #include <fcntl.h>
@@ -295,5 +285,3 @@ kread(addr, buf, size)
 		return -1;
 	return 0;
 }
-#endif
-

@@ -4,15 +4,17 @@
 #include <stdio.h>
 #include <string.h>
 #include <pwd.h>
-#include <time.h>
-
 #include <skey.h>
+#include <time.h>
 
 extern int optind;
 extern char *optarg;
 
-#define NAMELEN 2
+char * readpass();
 
+int skeylookup __P((struct skey *mp,char *name));
+
+#define NAMELEN 2
 int
 main(argc,argv)
 int argc;
@@ -101,7 +103,7 @@ char *argv[];
 	printf("Reminder you need the 6 english words from the skey command.\n");
 	for(i=0;;i++){
 		if(i >= 2) exit(1);
-		printf("Enter sequence count from 1 to 9999: ");
+		printf("Enter sequence count from 1 to 10000: ");
 		fgets(tmp,sizeof(tmp),stdin);
 		n = atoi(tmp);
 		if(n > 0 && n < 10000)
@@ -124,6 +126,7 @@ char *argv[];
 		printf("s/key %d %s\ns/key access password: ",n,seed);
 		fgets(tmp,sizeof(tmp),stdin);
 		rip(tmp);
+		backspace(tmp);
 		if(tmp[0] == '?'){
 			printf("Enter 6 English words from secure S/Key calculation.\n");
 			continue;

@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.3 1993/12/22 11:33:07 rgrimes Exp $
+# $Id: Makefile,v 1.2 1993/12/21 21:06:32 wollman Exp $
 #
 
 CFLAGS+= -I${.CURDIR}/../include
@@ -24,6 +24,6 @@ SRCS= ntpq.c ntpq_ops.c version.c
 beforedepend: version.c
 
 version.c: ${.CURDIR}/../VERSION
-	sh -e ${.CURDIR}/../scripts/mkversion ntpq
+	${.CURDIR}/../scripts/mkversion ntpq
 
 .include <bsd.prog.mk>

@@ -1,7 +1,7 @@
 /*
- * /src/NTP/REPOSITORY/v3/parse/util/parsetest.c,v 3.14 1994/05/12 12:49:27 kardel Exp
+ * /src/NTP/REPOSITORY/v3/parse/util/parsetest.c,v 3.13 1994/02/20 13:04:46 kardel Exp
  *
- * parsetest.c,v 3.14 1994/05/12 12:49:27 kardel Exp
+ * parsetest.c,v 3.13 1994/02/20 13:04:46 kardel Exp
  *
  * Copyright (c) 1989,1990,1991,1992,1993,1994
  * Frank Kardel Friedrich-Alexander Universitaet Erlangen-Nuernberg
@@ -10,13 +10,7 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  *
- * $Log: parsetest.c,v $
- * Revision 3.14  1994/05/12  12:49:27  kardel
- * printf fmt/arg cleanup
- *
- * Revision 3.14  1994/05/11  09:25:43  kardel
- * 3.3r + printf fmt/arg fixes
- *
+ * parsetest.c,v
  * Revision 3.13  1994/02/20  13:04:46  kardel
  * parse add/delete second support
  *
@@ -65,8 +59,7 @@ static char *strstatus(buffer, state)
       { PARSEB_NOSYNC,   "TIME CODE NOT CONFIRMED" },
       { PARSEB_DST,      "DST" },
       { PARSEB_UTC,      "UTC DISPLAY" },
-      { PARSEB_LEAPADD,  "LEAP ADDITION WARNING" },
-      { PARSEB_LEAPDEL,  "LEAP DELETION WARNING" },
+      { PARSEB_LEAP,     "LEAP WARNING" },
       { PARSEB_LEAPSECOND, "LEAP SECOND" },
       { PARSEB_ALTERNATE,"ALTERNATE ANTENNA" },
       { PARSEB_TIMECODE, "TIME CODE" },
@@ -201,7 +194,7 @@ main(argc, argv)
 	  parsetime_t parsetime;
 	  struct strioctl strioc;
 	  
-	  printf("parsetest.c,v 3.11 1994/01/23 19:00:01 kardel Exp\n");
+	  printf("parsetest.c,v 3.13 1994/02/20 13:04:46 kardel Exp\n");
 	  
 	  while (ioctl(fd, I_POP, 0) == 0)
 	    ;
@@ -222,7 +215,7 @@ main(argc, argv)
 	      perror("ioctl(fd, I_STR(PARSEIOC_GETSTAT))");
 	      exit(1);
 	    }
-	  printf("parse status: %04lx\n", (unsigned long)dct.parsestatus.flags);
+	  printf("parse status: %04x\n", dct.parsestatus.flags);
 
 	  dct.parsestatus.flags |= PARSE_STAT_FILTER;
 	  strioc.ic_cmd = PARSEIOC_SETSTAT;
@@ -239,7 +232,7 @@ main(argc, argv)
 	      perror("ioctl(fd, I_STR(PARSEIOC_GETSTAT))");
 	      exit(1);
 	    }
-	  printf("parse status: %04lx\n", (unsigned long)dct.parsestatus.flags);
+	  printf("parse status: %04x\n", dct.parsestatus.flags);
 
 	  while (read(fd, &parsetime, sizeof(parsetime)) == sizeof(parsetime))
 	    {
@@ -252,16 +245,15 @@ main(argc, argv)
 	      tmp1[24] = '\0';
 	      tmp2[24] = '\0';
 
-	      printf("%s (+%06ldus) %s PPS: %s (+%06ldus), ", tmp1, (long int)parsetime.parse_stime.tv.tv_usec, tmp, tmp2,
-		     (long int)parsetime.parse_ptime.tv.tv_usec);
+	      printf("%s (+%06dus) %s PPS: %s (+%06dus), ", tmp1, parsetime.parse_stime.tv.tv_usec, tmp, tmp2, parsetime.parse_ptime.tv.tv_usec);
 
 	      strstatus(tmp, parsetime.parse_state);
-	      printf("state: 0x%lx (%s) error: %ldus, dispersion: %ldus, Status: 0x%lx (%s)\n",
-		     (unsigned long)parsetime.parse_state,
+	      printf("state: 0x%x (%s) error: %dus, dispersion: %dus, Status: 0x%x (%s)\n",
+		     parsetime.parse_state,
 		     tmp,
-		     (long)parsetime.parse_usecerror,
-		     (long)parsetime.parse_usecdisp,
-		     (unsigned long)parsetime.parse_status,
+		     parsetime.parse_usecerror,
+		     parsetime.parse_usecdisp,
+		     parsetime.parse_status,
 		     parsestatus(parsetime.parse_status, tmp1));
 	    }
 	  

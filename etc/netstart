@@ -1,55 +1,43 @@
 #!/bin/sh -
 #
-#	$Id: netstart,v 1.16 1994/11/02 23:50:54 phk Exp $
+#	$Id: netstart,v 1.11 1994/05/04 08:59:52 rgrimes Exp $
 #	From: @(#)netstart	5.9 (Berkeley) 3/30/91
 
-defaultrouter=NO
 routedflags=-q
 timedflags=NO
 xntpdflags="NO"
 ntpdate="NO"
 rwhod=NO
 sendmail_flags="-bd -q30m"
-amdflags="NO"
-nfs_client=NO
-nfs_server=NO
-name_server=NO
-savecore=NO
 #kerberos_server=YES
+#nfs_server=YES
+#name_server=YES
 #gated=YES
 
 # my-name is my symbolic name
 # my-netmask is specified in /etc/networks
 #
-if [ -z "`hostname -s`" ] ; then
-	hostname=`cat /etc/myname`
-	hostname $hostname
-fi
+hostname=`cat /etc/myname`
+hostname $hostname
 
-for i in /etc/hostname.*
-do
-	ifn=`expr $i : '/etc/hostname\.\(.*\)'`
-	if [ -e /etc/hostname.$ifn ]; then
-		if [ -e /etc/start_if.$ifn ]; then
-			sh /etc/start_if.$ifn $ifn
-		fi
-		ifconfig $ifn `cat /etc/hostname.$ifn`
-		ifconfig $ifn
-	fi
-done
+if [ -e /etc/hostname.ed0 ]; then
+	ifconfig ed0 `cat /etc/hostname.ed0`
+fi
+if [ -e /etc/hostname.ed1 ]; then
+	ifconfig ed1 `cat /etc/hostname.ed1`
+fi
+if [ -e /etc/hostname.ie0 ]; then
+	ifconfig ie0 `cat /etc/hostname.ie0`
+fi
+if [ -e /etc/hostname.is0 ]; then
+	ifconfig is0 `cat /etc/hostname.is0`
+fi
+if [ -e /etc/hostname.ze0 ]; then
+	ifconfig ze0 `cat /etc/hostname.ze0`
+fi
 
 # set the address for the loopback interface
 ifconfig lo0 inet localhost
-
-# set interface for multicasts to default interface
-# this needs to happen before router discovery
-route add 224.0.0.0 -netmask 0xf0000000 -interface $hostname
-
-if [ -n "$defaultrouter" -a "x$defaultrouter" != "xNO" ] ; then
-	route add default $defaultrouter
-elif [ -f /etc/defaultrouter ] ; then
-	route add default `cat /etc/defaultrouter`
-fi
 
 # use loopback, not the wire
 # route add $hostname localhost

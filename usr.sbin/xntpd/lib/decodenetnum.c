@@ -1,4 +1,4 @@
-/*
+/* decodenetnum.c,v 3.1 1993/07/06 01:08:11 jbj Exp
  * decodenetnum - return a net number (this is crude, but careful)
  */
 #include <sys/types.h>
@@ -11,7 +11,7 @@
 int
 decodenetnum(num, netnum)
 	const char *num;
-	u_long *netnum;
+	U_LONG *netnum;
 {
 	register const char *cp;
 	register char *bp;

@@ -1,4 +1,4 @@
-/*
+/* ntp_util.c,v 3.1 1993/07/06 01:11:31 jbj Exp
  * ntp_util.c - stuff I didn't have any other place for
  */
 #include <stdio.h>
@@ -59,12 +59,6 @@ static FILEGEN clockstats;
  */
 extern int errno;
 
-/*
- * This controls whether stats are written to the fileset. Provided
- * so that xntpdc can turn off stats when the file system fills up. 
- */
-int stats_control;
-
 #ifdef DEBUG
 extern int debug;
 #endif
@@ -122,11 +116,12 @@ init_util()
 void
 hourly_stats()
 {
-	FILE *fp;
+	int fd;
+	char *val;
+	int vallen;
 	extern l_fp last_offset;
 	extern s_fp drift_comp;
-	extern u_char sys_poll;
-	extern int pll_status;
+	extern int time_constant;
 
 #ifdef DOSYNCTODR
 	struct timeval tv;
@@ -170,21 +165,32 @@ hourly_stats()
  skip:
 #endif
 
-	syslog(LOG_INFO, "offset %s freq %s poll %d",
-	    lfptoa(&last_offset, 6), fptoa(drift_comp, 3),
-	    sys_poll);
+	syslog(LOG_INFO, "offset %s freq %s comp %d",
+	       lfptoa(&last_offset, 6), fptoa(drift_comp, 5), time_constant);
 	
 	if (stats_drift_file != 0) {
-		if ((fp = fopen(stats_temp_file, "w")) == NULL) {
-			syslog(LOG_ERR, "can't open %s: %m",
-			    stats_temp_file);
+		fd = open(stats_temp_file, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+		if (fd == -1) {
+			syslog(LOG_ERR, "can't open %s: %m", stats_temp_file);
 			return;
 		}
-		fprintf(fp, "%s %x\n", fptoa(drift_comp, 3),
-		    pll_status);
-		(void)fclose(fp);
-		/* atomic */
-		(void) rename(stats_temp_file, stats_drift_file);
+
+		val = fptoa(drift_comp, 5);
+		vallen = strlen(val);
+		/*
+		 * Hack here.  Turn the trailing \0 into a \n and write it.
+		 */
+		val[vallen] = '\n';
+		if (write(fd, val, vallen+1) == -1) {
+			syslog(LOG_ERR, "write to %s failed: %m",
+			       stats_temp_file);
+			(void) close(fd);
+			(void) unlink(stats_temp_file);
+		} else {
+			(void) close(fd);
+			/* atomic */
+			(void) rename(stats_temp_file, stats_drift_file);
+		}
 	}
 }
 
@@ -197,11 +203,11 @@ stats_config(item, value)
 	int item;
 	char *value;	/* only one type so far */
 {
+	register char *cp;
 	FILE *fp;
+	int len;
 	char buf[128];
 	l_fp old_drift;
-	int temp = 0;
-	int len;
 
 	switch(item) {
 	case STATS_FREQ_FILE:
@@ -216,17 +222,19 @@ stats_config(item, value)
 			break;
 
 		stats_drift_file = emalloc((u_int)(len + 1));
-		stats_temp_file = emalloc((u_int)(len +
-		    sizeof(".TEMP")));
+		stats_temp_file = emalloc((u_int)(len + sizeof(".TEMP")));
 		memmove(stats_drift_file, value, len+1);
 		memmove(stats_temp_file, value, len);
-		memmove(stats_temp_file + len, ".TEMP",
-		    sizeof(".TEMP"));
+		memmove(stats_temp_file + len, ".TEMP", sizeof(".TEMP"));
 		L_CLR(&old_drift);
 
-		/*
-		 * Open drift file and read frequency and mode.
-		 */
+#ifdef DEBUG
+		if (debug > 1) {
+			printf("stats drift file %s\n", stats_drift_file);
+			printf("stats temp file %s\n", stats_temp_file);
+		}
+#endif
+
 		if ((fp = fopen(stats_drift_file, "r")) == NULL) {
 			if (errno != ENOENT)
 				syslog(LOG_ERR, "can't open %s: %m",
@@ -235,48 +243,71 @@ stats_config(item, value)
 			break;
 		}
 
-		if (fscanf(fp, "%s %x", buf, &temp) == 0) {
+		if (fgets(buf, sizeof buf, fp) == NULL) {
 			syslog(LOG_ERR, "can't read %s: %m",
 			       stats_drift_file);
 			(void) fclose(fp);
 		        loop_config(LOOP_DRIFTCOMP, &old_drift, 0);
 			break;
 		}
+
 		(void) fclose(fp);
+
+		/*
+		 * We allow leading spaces, then the number.  Terminate
+		 * at any trailing space or string terminator.
+		 */
+		cp = buf;
+		while (isspace(*cp))
+			cp++;
+		while (*cp != '\0' && !isspace(*cp))
+			cp++;
+		*cp = '\0';
+
 		if (!atolfp(buf, &old_drift)) {
 			syslog(LOG_ERR, "drift value %s invalid", buf);
 			break;
 		}
-		loop_config(LOOP_DRIFTCOMP, &old_drift, temp);
+
+		/*
+		 * Finally!  Give value to the loop filter.
+		 */
+#ifdef DEBUG
+		if (debug > 1) {
+			printf("loop_config finds old drift of %s\n",
+			       lfptoa(&old_drift, 9));
+		}
+#endif
+		loop_config(LOOP_DRIFTCOMP, &old_drift, 0);
 		break;
 	
 	case STATS_STATSDIR:
 		if (strlen(value) >= sizeof(statsdir)) {
 			syslog(LOG_ERR,
-			       "value for statsdir too long (>%d, sigh)",
+			       "value for statsdir too LONG (>%d, sigh)",
 			       sizeof(statsdir)-1);
 		} else {
 			l_fp now;
+			strcpy(statsdir,value);
 
 			gettstamp(&now);
-			strcpy(statsdir,value);
 			if(peerstats.prefix == &statsdir[0] &&
 			   peerstats.fp != NULL) {
 				fclose(peerstats.fp);
 				peerstats.fp = NULL;
-				filegen_setup(&peerstats, now.l_ui);
+				filegen_setup(&peerstats,now.l_ui);
 			}
 			if(loopstats.prefix == &statsdir[0] &&
 			   loopstats.fp != NULL) {
 				fclose(loopstats.fp);
 				loopstats.fp = NULL;
-				filegen_setup(&loopstats, now.l_ui);
+				filegen_setup(&loopstats,now.l_ui);
 			}
 			if(clockstats.prefix == &statsdir[0] &&
 			   clockstats.fp != NULL) {
 				fclose(clockstats.fp);
 				clockstats.fp = NULL;
-				filegen_setup(&clockstats, now.l_ui);
+				filegen_setup(&clockstats,now.l_ui);
 			}
 		}
 		break;
@@ -317,16 +348,14 @@ record_peer_stats(addr, status, offset, delay, dispersion)
 	u_fp dispersion;
 {
 	struct timeval tv;
-	u_long day, sec, msec;
+	U_LONG day, sec, msec;
 
-	if (!stats_control)
-		return;
 	GETTIMEOFDAY(&tv, (struct timezone *)NULL);
-	day = tv.tv_sec / 86400 + MJD_1970;
-	sec = tv.tv_sec % 86400;
-	msec = tv.tv_usec / 1000;
+	day = (U_LONG)tv.tv_sec / 86400 + MJD_1970;
+	sec = (U_LONG)tv.tv_sec % 86400;
+	msec = (U_LONG)tv.tv_usec / 1000;
 
-	filegen_setup(&peerstats, (u_long)(tv.tv_sec + JAN_1970));
+	filegen_setup(&peerstats, (U_LONG)(tv.tv_sec + JAN_1970));
 	if (peerstats.fp != NULL) {
 		fprintf(peerstats.fp, "%lu %lu.%03lu %s %x %s %s %s\n",
 			day, sec, msec, ntoa(addr), status, lfptoa(offset, 6),
@@ -345,26 +374,24 @@ record_peer_stats(addr, status, offset, delay, dispersion)
  * time constant (log base 2)
  */
 void
-record_loop_stats(offset, freq, poll)
+record_loop_stats(offset, drift_comp, time_constant)
 	l_fp *offset;
-        s_fp freq;
-        u_char poll;
+        s_fp *drift_comp;
+        int  time_constant;
 {
 	struct timeval tv;
-	u_long day, sec, msec;
+	U_LONG day, sec, msec;
 
-	if (!stats_control)
-		return;
 	GETTIMEOFDAY(&tv, (struct timezone *)NULL);
-	day = tv.tv_sec / 86400 + MJD_1970;
-	sec = tv.tv_sec % 86400;
-	msec = tv.tv_usec / 1000;
+	day = (U_LONG)tv.tv_sec / 86400 + MJD_1970;
+	sec = (U_LONG)tv.tv_sec % 86400;
+	msec = (U_LONG)tv.tv_usec / 1000;
 
-	filegen_setup(&loopstats, (u_long)(tv.tv_sec + JAN_1970));
+	filegen_setup(&loopstats, (U_LONG)(tv.tv_sec + JAN_1970));
 	if (loopstats.fp != NULL) {
 		fprintf(loopstats.fp, "%lu %lu.%03lu %s %s %d\n",
 			day, sec, msec, lfptoa(offset, 6),
-			fptoa(freq, 4), poll);
+			fptoa(*drift_comp, 4), time_constant);
 		fflush(loopstats.fp);
 	}
 }
@@ -384,16 +411,14 @@ record_clock_stats(addr, text)
 	char *text;
 {
 	struct timeval tv;
-	u_long day, sec, msec;
+	U_LONG day, sec, msec;
 
-	if (!stats_control)
-		return;
 	GETTIMEOFDAY(&tv, (struct timezone *)NULL);
-	day = tv.tv_sec / 86400 + MJD_1970;
-	sec = tv.tv_sec % 86400;
-	msec = tv.tv_usec / 1000;
+	day = (U_LONG)tv.tv_sec / 86400 + MJD_1970;
+	sec = (U_LONG)tv.tv_sec % 86400;
+	msec = (U_LONG)tv.tv_usec / 1000;
 
-	filegen_setup(&clockstats, (u_long)(tv.tv_sec + JAN_1970));
+	filegen_setup(&clockstats, (U_LONG)(tv.tv_sec + JAN_1970));
 	if (clockstats.fp != NULL) {
 		fprintf(clockstats.fp, "%lu %lu.%03lu %s %s\n",
 			day, sec, msec, ntoa(addr), text);

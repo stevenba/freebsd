@@ -861,8 +861,7 @@ put_fdisk_data
 echo
 echo -n "Labelling disk..."
 echo y | 
-/sbin/disklabel -w -r -B ${drivename}c $name
-# >/dev/null 2>&1
+/sbin/disklabel -w -r ${drivename} $name /usr/mdec/${drivetype}boot /usr/mdec/boot${drivetype} >/dev/null 2>&1
 echo	" done."
 
 # XXX - Do it again, incase we disklabeled sector 0!
@@ -1012,12 +1011,6 @@ echo "exit 1"
 ) >etc/rc
 echo "done."
 
-if [ "$hname" != "" ]; then /sbin/umount /dev/${drivename}h ; fi
-if [ "$gname" != "" ]; then /sbin/umount /dev/${drivename}g ; fi
-if [ "$fname" != "" ]; then /sbin/umount /dev/${drivename}f ; fi
-if [ "$ename" != "" ]; then /sbin/umount /dev/${drivename}e ; fi
-/sbin/umount /mnt
-
 sync
 
 echo
@@ -1034,9 +1027,7 @@ echo	"If all goes well, you can enter the command \`copy' at the prompt to"
 echo	"copy the kernel to the hard disk.  When asked for which partition to"
 echo	"copy to, enter \`${drivename}a' (without the quotes)."
 echo
-echo	"The light on the floppy may not go out, so don't wait for it."
-echo
-echo	"Okay, that's all for now.  I'm halting ..."
+echo	"Okay, that's all for now.  I'm waiting for you to enter \`halt'..."
 
 sync;sync;sync;sync
-halt
+

@@ -1,4 +1,4 @@
-/*
+/* authkeys.c,v 3.1 1993/07/06 01:07:51 jbj Exp
  * authkeys.c - routines to manage the storage of authentication keys
  */
 #include <stdio.h>
@@ -21,7 +21,7 @@ struct savekey {
 	    char MD5_key[32];
 #endif
 	} k;
-	u_long keyid;
+	U_LONG keyid;
 	u_short flags;
 #ifdef	MD5
 	int keylen;
@@ -57,6 +57,7 @@ U_LONG authkeyuncached;
 U_LONG authnokey;		/* calls to encrypt with no key */
 U_LONG authencryptions;
 U_LONG authdecryptions;
+U_LONG authdecryptok;
 
 /*
  * Storage for free key structures.  We malloc() such things but
@@ -89,7 +90,7 @@ u_char DEScache_dkeys[KEY_SCHED_SIZE];
 /*
  * The key cache.  We cache the last key we looked at here.
  */
-u_long cache_keyid;
+U_LONG cache_keyid;
 u_short cache_flags;
 
 #ifdef	MD5
@@ -113,7 +114,7 @@ init_auth()
 
 	authnumfreekeys =  authkeynotfound = authkeylookups = 0;
 	authnumkeys = authuncached = authkeyuncached = authnokey = 0;
-	authencryptions = authdecryptions = 0;
+	authencryptions = authdecryptions = authdecryptok = 0;
 
 #ifdef	DES
 	/*
@@ -132,7 +133,7 @@ init_auth()
  */
 struct savekey *
 auth_findkey(keyno)
-	u_long keyno;
+	U_LONG keyno;
 {
 	register struct savekey *sk;
 
@@ -151,7 +152,7 @@ auth_findkey(keyno)
  */
 int
 auth_havekey(keyno)
-	u_long keyno;
+	U_LONG keyno;
 {
 	register struct savekey *sk;
 
@@ -181,7 +182,7 @@ auth_havekey(keyno)
  */
 int
 authhavekey(keyno)
-	u_long keyno;
+	U_LONG keyno;
 {
 	register struct savekey *sk;
 
@@ -248,7 +249,7 @@ auth_moremem()
  */
 void
 authtrust(keyno, trust)
-	u_long keyno;
+	U_LONG keyno;
 	int trust;
 {
 	register struct savekey *sk;
@@ -315,7 +316,7 @@ authtrust(keyno, trust)
  */
 int
 authistrusted(keyno)
-	u_long keyno;
+	U_LONG keyno;
 {
 	register struct savekey *sk;
 
@@ -344,7 +345,7 @@ authistrusted(keyno)
  */
 void
 DESauth_setkey(keyno, key)
-	u_long keyno;
+	U_LONG keyno;
 	const U_LONG *key;
 {
 	register struct savekey *sk;
@@ -392,7 +393,7 @@ DESauth_setkey(keyno, key)
 #ifdef	MD5
 void
 MD5auth_setkey(keyno, key)
-    u_long keyno;
+    U_LONG keyno;
     const U_LONG *key;
 {
 	register struct savekey *sk;
@@ -486,7 +487,7 @@ auth_delkeys()
  */
 void
 auth1crypt(keyno, pkt, length)
-	u_long keyno;
+	U_LONG keyno;
 	U_LONG *pkt;
 	int length;	/* length of all encrypted data */
 {
@@ -519,7 +520,7 @@ auth1crypt(keyno, pkt, length)
  */
 int
 auth2crypt(keyno, pkt, length)
-	u_long keyno;
+	U_LONG keyno;
 	U_LONG *pkt;
 	int length;	/* total length of encrypted area */
 {
@@ -546,7 +547,7 @@ auth2crypt(keyno, pkt, length)
 
 int
 authencrypt(keyno, pkt, length)
-	u_long keyno;
+	U_LONG keyno;
 	U_LONG *pkt;
 	int length;	/* length of encrypted portion of packet */
 {
@@ -575,7 +576,7 @@ authencrypt(keyno, pkt, length)
 
 int
 authdecrypt(keyno, pkt, length)
-    u_long keyno;
+    U_LONG keyno;
     U_LONG *pkt;
     int length;	/* length of variable data in octets */
 {

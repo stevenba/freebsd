@@ -1,4 +1,4 @@
-/*
+/* hextoint.c,v 3.1 1993/07/06 01:08:21 jbj Exp
  * hextoint - convert an ascii string in hex to an unsigned
  *	      long, with error checking
  */
@@ -9,9 +9,9 @@
 int
 hextoint(str, ival)
 	const char *str;
-	u_long *ival;
+	U_LONG *ival;
 {
-	register u_long u;
+	register U_LONG u;
 	register const char *cp;
 
 	cp = str;

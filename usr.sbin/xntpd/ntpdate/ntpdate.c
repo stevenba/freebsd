@@ -1,4 +1,4 @@
-/*
+/* ntpdate.c,v 3.1 1993/07/06 01:09:22 jbj Exp
  * ntpdate - set the time of day by polling one or more NTP servers
  */
 #include <stdio.h>
@@ -92,19 +92,19 @@ char *progname;
  * Systemwide parameters and flags
  */
 int sys_samples = DEFSAMPLES;		/* number of samples/server */
-u_long sys_timeout = DEFTIMEOUT;	/* timeout time, in TIMER_HZ units */
+U_LONG sys_timeout = DEFTIMEOUT;	/* timeout time, in TIMER_HZ units */
 struct server **sys_servers;		/* the server list */
 int sys_numservers = 0;			/* number of servers to poll */
 int sys_maxservers = 0;			/* max number of servers to deal with */
 int sys_authenticate = 0;		/* true when authenticating */
-u_long sys_authkey = 0;			/* set to authentication key in use */
-u_long sys_authdelay = 0;		/* authentication delay */
+U_LONG sys_authkey = 0;			/* set to authentication key in use */
+U_LONG sys_authdelay = 0;		/* authentication delay */
 int sys_version = NTP_VERSION;		/* version to poll with */
 
 /*
  * The current internal time
  */
-u_long current_time = 0;
+U_LONG current_time = 0;
 
 /*
  * Counter for keeping track of completed servers
@@ -149,7 +149,7 @@ static  void    input_handler   P((void));
 static	int	l_adj_systime	P((l_fp *));
 static  int	l_step_systime  P((l_fp *));
 
-static	int	getnetnum	P((char *, u_long *));
+static	int	getnetnum	P((char *, U_LONG *));
 static	void	printserver	P((struct server *, FILE *));
 
 /*
@@ -183,7 +183,7 @@ main(argc, argv)
 		case 'a':
 			c = atoi(ntp_optarg);
 			sys_authenticate = 1;
-			sys_authkey = c;
+			sys_authkey = (U_LONG)c;
 			break;
 		case 'b':
 			always_step++;
@@ -313,7 +313,7 @@ main(argc, argv)
 		if (!authhavekey(sys_authkey)) {
 			char buf[10];
 
-			(void) sprintf(buf, "%lu", (unsigned long)sys_authkey);
+			(void) sprintf(buf, "%u", sys_authkey);
 			syslog(LOG_ERR, "authentication key %s unknown", buf);
 			exit(1);
 		}
@@ -418,7 +418,7 @@ transmit(server)
 		 * Last message to this server timed out.  Shift
 		 * zeros into the filter.
 		 */
-		L_CLR(&ts);
+		ts.l_ui = ts.l_uf = 0;
 		server_data(server, 0, &ts, 0);
 	}
 
@@ -444,9 +444,9 @@ transmit(server)
 	xpkt.rootdelay = htonl(NTPDATE_DISTANCE);
 	xpkt.rootdispersion = htonl(NTPDATE_DISP);
 	xpkt.refid = htonl(NTPDATE_REFID);
-	L_CLR(&xpkt.reftime);
-	L_CLR(&xpkt.org);
-	L_CLR(&xpkt.rec);
+	xpkt.reftime.l_ui = xpkt.reftime.l_uf = 0;
+	xpkt.org.l_ui = xpkt.org.l_uf = 0;
+	xpkt.rec.l_ui = xpkt.rec.l_uf = 0;
 
 	/*
 	 * Determine whether to authenticate or not.  If so,
@@ -494,7 +494,8 @@ receive(rbufp)
 	register struct pkt *rpkt;
 	register struct server *server;
 	register s_fp di;
-	l_fp t10, t23;
+	register U_LONG t10_ui, t10_uf;
+	register U_LONG t23_ui, t23_uf;
 	l_fp org;
 	l_fp rec;
 	l_fp ci;
@@ -563,9 +564,9 @@ receive(rbufp)
 		is_authentic = 0;
 
 		if (debug > 3)
-		    printf("receive: rpkt keyid=%ld sys_authkey=%ld decrypt=%ld\n",
-			   (long int)ntohl(rpkt->keyid), (long int)sys_authkey, 
-			   (long int)authdecrypt(sys_authkey, (U_LONG *)rpkt,
+		    printf("receive: rpkt keyid=%d sys_authkey=%d decrypt=%d\n",
+			   ntohl(rpkt->keyid), sys_authkey, 
+			   authdecrypt(sys_authkey, (U_LONG *)rpkt,
 				       LEN_PKT_NOMAC));
 
 		if (has_mac && ntohl(rpkt->keyid) == sys_authkey &&
@@ -596,7 +597,7 @@ receive(rbufp)
 	 * Make sure the server is at least somewhat sane.  If not, try
 	 * again.
 	 */
-	if (L_ISZERO(&rec) || !L_ISHIS(&server->org, &rec)) {
+	if ((rec.l_ui == 0 && rec.l_uf == 0) || !L_ISHIS(&server->org, &rec)) {
 		transmit(server);
 		return;
 	}
@@ -608,32 +609,36 @@ receive(rbufp)
 	 * d = (t2 - t3) - (t1 - t0)
 	 * c = ((t2 - t3) + (t1 - t0)) / 2
 	 */
-	t10 = server->org;		/* pkt.xmt == t1 */
-	L_SUB(&t10, &rbufp->recv_time);	/* recv_time == t0*/
+	t10_ui = server->org.l_ui;	/* pkt.xmt == t1 */
+	t10_uf = server->org.l_uf;
+	M_SUB(t10_ui, t10_uf, rbufp->recv_time.l_ui,
+	    rbufp->recv_time.l_uf);	/* recv_time == t0*/
 
-	t23 = rec;			/* pkt.rec == t2 */
-	L_SUB(&t23, &org);		/* pkt->org == t3 */
+	t23_ui = rec.l_ui;	/* pkt.rec == t2 */
+	t23_uf = rec.l_uf;
+	M_SUB(t23_ui, t23_uf, org.l_ui, org.l_uf);	/* pkt->org == t3 */
 
 	/* now have (t2 - t3) and (t0 - t1).  Calculate (ci) and (di) */
-	ci = t10;
-	L_ADD(&ci, &t23);
-	L_RSHIFT(&ci);
+	ci.l_ui = t10_ui;
+	ci.l_uf = t10_uf;
+	M_ADD(ci.l_ui, ci.l_uf, t23_ui, t23_uf);
+	M_RSHIFT(ci.l_i, ci.l_uf);
 
 	/*
 	 * Calculate di in t23 in full precision, then truncate
 	 * to an s_fp.
 	 */
-	L_SUB(&t23, &t10);
-	di = LFPTOFP(&t23);
+	M_SUB(t23_ui, t23_uf, t10_ui, t10_uf);
+	di = MFPTOFP(t23_ui, t23_uf);
 
 	if (debug > 3)
-		printf("offset: %s, delay %s\n", lfptoa(&ci, 6), fptoa(di, 5));
+		printf("offset: %s, delay %s\n", lfptoa(&ci, 9), fptoa(di, 4));
 
 	di += (FP_SECOND >> (-(int)NTPDATE_PRECISION))
 	    + (FP_SECOND >> (-(int)server->precision)) + NTP_MAXSKW;
 
 	if (di <= 0) {		/* value still too raunchy to use? */
-		L_CLR(&ci);
+		ci.l_ui = ci.l_uf = 0;
 		di = 0;
 	} else {
 		di = max(di, NTP_MINDIST);
@@ -663,7 +668,7 @@ server_data(server, d, c, e)
 	if (i < NTP_SHIFT) {
 		server->filter_delay[i] = d;
 		server->filter_offset[i] = *c;
-		server->filter_soffset[i] = LFPTOFP(c);
+		server->filter_soffset[i] = MFPTOFP(c->l_ui, c->l_uf);
 		server->filter_error[i] = e;
 		server->filter_nextpt = i + 1;
 	}
@@ -709,7 +714,7 @@ clock_filter(server)
 	 */
 	if (server->filter_delay[ord[0]] == 0) {
 		server->delay = 0;
-		L_CLR(&server->offset);
+		server->offset.l_ui = server->offset.l_uf = 0;
 		server->soffset = 0;
 		server->dispersion = PEER_MAXDISP;
 	} else {
@@ -781,12 +786,12 @@ clock_select()
 		}
 		if (server->leap == LEAP_NOTINSYNC)
 			continue;	/* he's in trouble */
-		if (!L_ISHIS(&server->org, &server->reftime)) {
+		if (server->org.l_ui < server->reftime.l_ui) {
 			continue;	/* very broken host */
 		}
 		if ((server->org.l_ui - server->reftime.l_ui)
 		    >= NTP_MAXAGE) {
-			continue;	/* too long without sync */
+			continue;	/* too LONG without sync */
 		}
 		if (server->trust != 0) {
 			continue;
@@ -979,13 +984,13 @@ clock_adjust()
 		if (simple_query || l_step_systime(&server->offset)) {
 			syslog(LOG_NOTICE, "step time server %s offset %s",
 			    ntoa(&server->srcadr),
-			    lfptoa(&server->offset, 6));
+			    lfptoa(&server->offset, 7));
 		}
 	} else {
 		if (simple_query || l_adj_systime(&server->offset)) {
 			syslog(LOG_NOTICE, "adjust time server %s offset %s",
 			    ntoa(&server->srcadr),
-			    lfptoa(&server->offset, 6));
+			    lfptoa(&server->offset, 7));
 		}
 	}
 	return(0);
@@ -1002,7 +1007,7 @@ addserver(serv)
 	char *serv;
 {
 	register struct server *server;
-	u_long netnum;
+	U_LONG netnum;
 	static int toomany = 0;
 
 	if (sys_numservers >= sys_maxservers) {
@@ -1032,7 +1037,7 @@ addserver(serv)
 	server->srcadr.sin_port = htons(NTP_PORT);
 
 	sys_servers[sys_numservers++] = server;
-	server->event_time = sys_numservers;
+	server->event_time = (U_LONG)sys_numservers;
 }
 
 
@@ -1044,7 +1049,7 @@ findserver(addr)
 	struct sockaddr_in *addr;
 {
 	register int i;
-	register u_long netnum;
+	register U_LONG netnum;
 
 	if (htons(addr->sin_port) != NTP_PORT)
 		return 0;
@@ -1186,7 +1191,7 @@ init_io()
 		memset((char *)&addr, 0, sizeof addr);
 		addr.sin_family = AF_INET;
 		addr.sin_port = htons(NTP_PORT);
-		addr.sin_addr.s_addr = htonl(INADDR_ANY);
+		addr.sin_addr.s_addr = INADDR_ANY;
 		if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
 			if (errno == EADDRINUSE)
 				syslog(LOG_ERR,
@@ -1361,7 +1366,7 @@ input_handler()
 
 
 /*
- * adj_systime - do a big long slew of the system time
+ * adj_systime - do a big LONG slew of the system time
  */
 static int
 l_adj_systime(ts)
@@ -1420,7 +1425,8 @@ l_step_systime(ts)
 {
 #ifdef SLEWALWAYS 
 #ifdef STEP_SLEW
-	l_fp ftmp;
+	register U_LONG tmp_ui;
+	register U_LONG tmp_uf;
 	int isneg;
 	int n;
 
@@ -1428,17 +1434,17 @@ l_step_systime(ts)
 	/*
 	 * Take the absolute value of the offset
 	 */
-	ftmp = ts;
-	if (L_ISNEG(&ftmp)) {
-		L_NEG(&tmp);
+	tmp_ui = ts->l_ui;
+	tmp_uf = ts->l_uf;
+	if (M_ISNEG(tmp_ui, tmp_uf)) {
+		M_NEG(tmp_ui, tmp_uf);
 		isneg = 1;
 	} else
 		isneg = 0;
 
 	if (tmp_ui >= 3) {		/* Step it and slew - we might win */
              n = step_systime_real(ts);
-	     if (!n)
-		return n;
+	     if (!n) return n;
 	     if (isneg) 
 		ts->l_ui = ~0;
 	     else
@@ -1450,8 +1456,7 @@ l_step_systime(ts)
          * line.
          */
 #endif
-	if (debug)
-		return 1;
+	if (debug) return 1;
 #ifdef FORCE_NTPDATE_STEP
         return step_systime_real(ts);
 #else
@@ -1459,8 +1464,7 @@ l_step_systime(ts)
 	return 1;
 #endif
 #else /* SLEWALWAYS  */
-	if (debug)
-		return 1;
+	if (debug) return 1;
         return step_systime_real(ts);
 #endif	/* SLEWALWAYS */
 }
@@ -1471,7 +1475,7 @@ l_step_systime(ts)
 static int
 getnetnum(host, num)
 	char *host;
-	u_long *num;
+	U_LONG *num;
 {
 	struct hostent *hp;
 
@@ -1500,7 +1504,7 @@ printserver(pp, fp)
 	if (!debug) {
 	    (void) fprintf(fp, "server %s, stratum %d, offset %s, delay %s\n",
 			   ntoa(&pp->srcadr), pp->stratum,
-			   lfptoa(&pp->offset, 6), fptoa(pp->delay, 5));
+			   lfptoa(&pp->offset, 7), ufptoa(pp->delay, 4));
 	    return;
 	}
 
@@ -1522,8 +1526,8 @@ printserver(pp, fp)
 	}
 	(void) fprintf(fp,
 	    "refid [%s], delay %s, dispersion %s\n",
-	    str, fptoa(pp->delay, 5),
-	    ufptoa(pp->dispersion, 5));
+	    str, fptoa(pp->delay, 4),
+	    ufptoa(pp->dispersion, 4));
 	
 	(void) fprintf(fp, "transmitted %d, in filter %d\n",
 	    pp->xmtcnt, pp->filter_nextpt);
@@ -1537,7 +1541,7 @@ printserver(pp, fp)
 	
 	(void) fprintf(fp, "filter delay: ");
 	for (i = 0; i < NTP_SHIFT; i++) {
-		(void) fprintf(fp, " %-8.8s", fptoa(pp->filter_delay[i], 5));
+		(void) fprintf(fp, " %-8.8s", ufptoa(pp->filter_delay[i],4));
 		if (i == (NTP_SHIFT>>1)-1)
 			(void) fprintf(fp, "\n              ");
 	}
@@ -1545,17 +1549,17 @@ printserver(pp, fp)
 
 	(void) fprintf(fp, "filter offset:");
 	for (i = 0; i < PEER_SHIFT; i++) {
-		(void) fprintf(fp, " %-8.8s", lfptoa(&pp->filter_offset[i], 6));
+		(void) fprintf(fp, " %-8.8s", lfptoa(&pp->filter_offset[i], 5));
 		if (i == (PEER_SHIFT>>1)-1)
 			(void) fprintf(fp, "\n              ");
 	}
 	(void) fprintf(fp, "\n");
 
 	(void) fprintf(fp, "delay %s, dispersion %s\n",
-	    fptoa(pp->delay, 5), ufptoa(pp->dispersion, 5));
+	    ufptoa(pp->delay, 4), ufptoa(pp->dispersion, 4));
 
 	(void) fprintf(fp, "offset %s\n\n",
-	    lfptoa(&pp->offset, 6));
+	    lfptoa(&pp->offset, 7));
 }
 
 #if defined(NEED_VSPRINTF)

@@ -1,8 +1,8 @@
 #if defined(REFCLOCK) && (defined(PARSE) || defined(PARSEPPS)) && defined(CLOCK_RAWDCF)
 /*
- * /src/NTP/REPOSITORY/v3/parse/clk_rawdcf.c,v 3.16 1994/05/31 20:02:40 kardel Exp
+ * /src/NTP/REPOSITORY/v3/parse/clk_rawdcf.c,v 3.13 1994/03/10 19:00:43 kardel Exp
  *  
- * clk_rawdcf.c,v 3.16 1994/05/31 20:02:40 kardel Exp
+ * clk_rawdcf.c,v 3.13 1994/03/10 19:00:43 kardel Exp
  *
  * Raw DCF77 pulse clock support
  *
@@ -79,13 +79,12 @@
  * 59		      - usually missing (minute indication), except for leap insertion
  */
 
-static u_long cvt_rawdcf();
-static u_long pps_rawdcf();
-static u_long snt_rawdcf();
+static unsigned LONG cvt_rawdcf();
+static unsigned LONG pps_rawdcf();
+static unsigned LONG snt_rawdcf();
 
 clockformat_t clock_rawdcf =
 {
-  (unsigned LONG (*)())0,	/* no input handling */
   cvt_rawdcf,			/* raw dcf input conversion */
   (void (*)())0,		/* no character bound synchronisation */
   pps_rawdcf,			/* examining PPS information */
@@ -95,7 +94,6 @@ clockformat_t clock_rawdcf =
   61,				/* bit buffer */
   SYNC_ONE|SYNC_ZERO|SYNC_TIMEOUT|SYNC_SYNTHESIZE|CVT_FIXEDONLY,
   /* catch all transitions, buffer restart on timeout, fixed configuration only */
-  0,				/* no private data (currently in input buffer) */
   { 1, 500000},			/* restart after 1.5 seconds */
   '\0',
   '\0',
@@ -157,12 +155,12 @@ static struct partab
 #define DCF_Z_MET 0x2
 #define DCF_Z_MED 0x1
 
-static u_long ext_bf(buf, idx, zero)
+static unsigned LONG ext_bf(buf, idx, zero)
   register char *buf;
   register int   idx;
   register char *zero;
 {
-  register u_long sum = 0;
+  register unsigned LONG sum = 0;
   register int i, first;
 
   first = rawdcfcode[idx].offset;
@@ -191,7 +189,7 @@ static unsigned pcheck(buf, idx, zero)
   return psum;
 }
 
-static u_long convert_rawdcf(buffer, size, dcfparam, clock)
+static unsigned LONG convert_rawdcf(buffer, size, dcfparam, clock)
   register unsigned char   *buffer;
   register int              size;
   register struct dcfparam *dcfparam;
@@ -286,9 +284,9 @@ static u_long convert_rawdcf(buffer, size, dcfparam, clock)
       if (ext_bf(buffer, DCF_R, dcfparam->zerobits))
 	clock->flags |= PARSEB_ALTERNATE;
 
-      parseprintf(DD_RAWDCF,("parse: convert_rawdcf: TIME CODE OK: %d:%d, %d.%d.%d, flags 0x%lx\n",
-			  (int)clock->hour, (int)clock->minute, (int)clock->day, (int)clock->month,(int) clock->year,
-			  (u_long)clock->flags));
+      parseprintf(DD_RAWDCF,("parse: convert_rawdcf: TIME CODE OK: %d:%d, %d.%d.%d, flags 0x%x\n",
+			  clock->hour, clock->minute, clock->day, clock->month, clock->year,
+			  clock->flags));
       return CVT_OK;
     }
   else
@@ -309,7 +307,7 @@ static u_long convert_rawdcf(buffer, size, dcfparam, clock)
  * raw dcf input routine - needs to fix up 50 baud
  * characters for 1/0 decision
  */
-static u_long cvt_rawdcf(buffer, size, param, clock)
+static unsigned LONG cvt_rawdcf(buffer, size, param, clock)
   register unsigned char   *buffer;
   register int              size;
   register void            *param;
@@ -467,12 +465,12 @@ static u_long cvt_rawdcf(buffer, size, param, clock)
  * also ones and zeros (which is easy)
  */
 /*ARGSUSED*/
-static u_long pps_rawdcf(parseio, status, ptime)
+static unsigned LONG pps_rawdcf(parseio, status, ptime)
   register parse_t *parseio;
   register int status;
   register timestamp_t *ptime;
 {
-  if (status)
+  if (!status)
     {
       parseio->parse_dtime.parse_ptime  = *ptime;
       parseio->parse_dtime.parse_state |= PARSEB_PPS|PARSEB_S_PPS;
@@ -482,12 +480,12 @@ static u_long pps_rawdcf(parseio, status, ptime)
 }
 
 /*ARGSUSED*/
-static u_long snt_rawdcf(parseio, ptime)
+static unsigned LONG snt_rawdcf(parseio, ptime)
   register parse_t *parseio;
   register timestamp_t *ptime;
 {
   clocktime_t clock;
-  u_long cvtrtc;
+  unsigned LONG cvtrtc;
   time_t t;
   
   /*
@@ -531,16 +529,7 @@ static u_long snt_rawdcf(parseio, ptime)
 /*
  * History:
  *
- * clk_rawdcf.c,v $ 
- * Revision 3.16  1994/05/31  20:02:40  kardel
- * sync on ONE transition
- *
- * Revision 3.15  1994/05/30  10:20:01  kardel
- * LONG cleanup
- *
- * Revision 3.14  1994/05/12  12:49:09  kardel
- * printf fmt/arg cleanup
- *
+ * clk_rawdcf.c,v
  * Revision 3.13  1994/03/10  19:00:43  kardel
  * clear utctime field to avoid confusion on synthesize time stamps
  *

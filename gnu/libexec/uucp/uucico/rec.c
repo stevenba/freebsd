@@ -26,7 +26,7 @@
 #include "uucp.h"
 
 #if USE_RCS_ID
-const char rec_rcsid[] = "$Id: rec.c,v 1.2 1994/05/07 18:13:55 ache Exp $";
+const char rec_rcsid[] = "$Id: rec.c,v 1.34 1994/04/04 03:25:12 ian Rel $";
 #endif
 
 #include <errno.h>
@@ -793,6 +793,15 @@ fremote_send_reply (qtrans, qdaemon)
   else
     sprintf (ab + 2, " 0x%lx", (unsigned long) qtrans->ipos);
 
+  if (! (*qdaemon->qproto->pfsendcmd) (qdaemon, ab, qtrans->ilocal,
+				       qtrans->iremote))
+    {
+      (void) ffileclose (qtrans->e);
+      (void) remove (qinfo->ztemp);
+      urrec_free (qtrans);
+      return FALSE;
+    }
+
   qinfo->freplied = TRUE;
 
   if (qdaemon->qproto->pffile != NULL)
@@ -807,15 +816,6 @@ fremote_send_reply (qtrans, qdaemon)
 	  urrec_free (qtrans);
 	  return FALSE;
 	}
-    }
-
-  if (! (*qdaemon->qproto->pfsendcmd) (qdaemon, ab, qtrans->ilocal,
-				       qtrans->iremote))
-    {
-      (void) ffileclose (qtrans->e);
-      (void) remove (qinfo->ztemp);
-      urrec_free (qtrans);
-      return FALSE;
     }
 
   return TRUE;
@@ -862,8 +862,6 @@ fremote_send_fail_send (qtrans, qdaemon)
   struct srecfailinfo *qinfo = (struct srecfailinfo *) qtrans->pinfo;
   char ab[4];
   boolean fret;
-  int ilocal = qtrans->ilocal;
-  int iremote = qtrans->iremote;
 
   /* Wait for the end of file marker if we haven't gotten it yet.  */
   if (! qinfo->freceived)
@@ -900,6 +898,9 @@ fremote_send_fail_send (qtrans, qdaemon)
   
   ab[3] = '\0';
 
+  fret = (*qdaemon->qproto->pfsendcmd) (qdaemon, ab, qtrans->ilocal,
+					qtrans->iremote);
+
   qinfo->fsent = TRUE;
 
   if (qinfo->freceived)
@@ -907,8 +908,6 @@ fremote_send_fail_send (qtrans, qdaemon)
       xfree (qtrans->pinfo);
       utransfree (qtrans);
     }
-
-  fret = (*qdaemon->qproto->pfsendcmd) (qdaemon, ab, ilocal, iremote);
 
   return fret;
 }
@@ -1236,8 +1235,6 @@ frec_file_send_confirm (qtrans, qdaemon)
   struct srecinfo *qinfo = (struct srecinfo *) qtrans->pinfo;
   const char *zsend;
   boolean fret;
-  int ilocal = qtrans->ilocal;
-  int iremote = qtrans->iremote;
 
   if (! qinfo->fmoved)
     zsend = "CN5";
@@ -1255,6 +1252,9 @@ frec_file_send_confirm (qtrans, qdaemon)
       zsend = "CYM";
     }
 
+  fret = (*qdaemon->qproto->pfsendcmd) (qdaemon, zsend,
+					qtrans->ilocal, qtrans->iremote);
+
   /* Now, if that was a remote command, then when the confirmation
      message is acked we no longer have to remember that we received
      that file.  */
@@ -1262,9 +1262,6 @@ frec_file_send_confirm (qtrans, qdaemon)
     usent_receive_ack (qdaemon, qtrans);
 
   urrec_free (qtrans);
-
-  fret = (*qdaemon->qproto->pfsendcmd) (qdaemon, zsend, ilocal, iremote);
-
   return fret;
 }
 

@@ -1,4 +1,4 @@
-/*
+/* ntpq_ops.c,v 3.1 1993/07/06 01:09:32 jbj Exp
  * ntpdc_ops.c - subroutines which are called to perform operations by xntpdc
  */
 #include <stdio.h>
@@ -18,7 +18,7 @@ int		maxhostlen;
 /*
  * Declarations for command handlers in here
  */
-static	int	checkassocid	P((u_long));
+static	int	checkassocid	P((U_LONG));
 static	char *	strsave		P((char *));
 static	struct varlist *findlistvar	P((struct varlist *, char *));
 static	void	doaddvlist	P((struct varlist *, char *));
@@ -38,7 +38,7 @@ static	void	readvar		P((struct parse *, FILE *));
 static	void	writevar	P((struct parse *, FILE *));
 static	void	clocklist	P((struct parse *, FILE *));
 static	void	clockvar	P((struct parse *, FILE *));
-static	int	findassidrange	P((u_long, u_long, int *, int *));
+static	int	findassidrange	P((U_LONG, U_LONG, int *, int *));
 static	void	mreadlist	P((struct parse *, FILE *));
 static	void	mreadvar	P((struct parse *, FILE *));
 static	int	dogetassoc	P((FILE *));
@@ -159,7 +159,7 @@ struct xcmd opcmds[] = {
  * Variable list data space
  */
 #define	MAXLIST		64	/* maximum number of variables in list */
-#define	LENHOSTNAME	256	/* host name is 256 characters long */
+#define	LENHOSTNAME	256	/* host name is 256 characters LONG */
 /*
  * Old CTL_PST defines for version 2.
  */
@@ -205,7 +205,7 @@ extern u_char pktversion;
  */
 static int
 checkassocid(value)
-	u_long value;
+	U_LONG value;
 {
 	if (value == 0 || value >= 65536) {
 		(void) fprintf(stderr, "***Invalid association ID specified\n");
@@ -706,8 +706,8 @@ clockvar(pcmd, fp)
  */
 static int
 findassidrange(assid1, assid2, from, to)
-	u_long assid1;
-	u_long assid2;
+	U_LONG assid1;
+	U_LONG assid2;
 	int *from;
 	int *to;
 {
@@ -716,13 +716,13 @@ findassidrange(assid1, assid2, from, to)
 
 	if (assid1 == 0 || assid1 > 65535) {
 		(void) fprintf(stderr,
-		    "***Invalid association ID %lu specified\n", (u_long)assid1);
+		    "***Invalid association ID %lu specified\n", assid1);
 		return 0;
 	}
 
 	if (assid2 == 0 || assid2 > 65535) {
 		(void) fprintf(stderr,
-		    "***Invalid association ID %lu specified\n", (u_long)assid2);
+		    "***Invalid association ID %lu specified\n", assid2);
 		return 0;
 	}
 
@@ -743,7 +743,7 @@ findassidrange(assid1, assid2, from, to)
 	if (f == -1 || t == -1) {
 		(void) fprintf(stderr,
 		    "***Association ID %lu not found in list\n",
-		    (f == -1) ? (u_long)assid1 : (u_long)assid2);
+		    (f == -1) ? assid1 : assid2);
 		return 0;
 	}
 
@@ -876,7 +876,7 @@ printassoc(showall, fp)
 	int i;
 	u_char statval;
 	int event;
-	u_long event_count;
+	U_LONG event_count;
 	char *conf;
 	char *reach;
 	char *auth;
@@ -1028,7 +1028,7 @@ associations(pcmd, fp)
 
 
 /*
- * lassociations - get, record and print a long list of associations
+ * lassociations - get, record and print a LONG list of associations
  */
 /*ARGSUSED*/
 static void
@@ -1055,7 +1055,7 @@ passociations(pcmd, fp)
 
 
 /*
- * lpassociations - print the long association list
+ * lpassociations - print the LONG association list
  */
 /*ARGSUSED*/
 static void
@@ -1146,7 +1146,7 @@ fixup(width, str)
 
 
 /*
- * when - print how long its been since his last packet arrived
+ * when - print how LONG its been since his last packet arrived
  */
 static char *
 when(ts, rec, reftime)
@@ -1154,7 +1154,7 @@ when(ts, rec, reftime)
 	l_fp *rec;
 	l_fp *reftime;
 {
-	long diff;
+	LONG diff;
 	l_fp *lasttime;
 	static char buf[20];
 
@@ -1165,7 +1165,7 @@ when(ts, rec, reftime)
 	else
 		return "-";
 	
-	diff = (long)(ts->l_ui - lasttime->l_ui);
+	diff = (LONG)(ts->l_ui - lasttime->l_ui);
 	if (diff <= 0) {
 		/*
 		 * Time warp?
@@ -1174,24 +1174,24 @@ when(ts, rec, reftime)
 	}
 
 	if (diff <= 2048) {
-		(void) sprintf(buf, "%ld", (long int)diff);
+		(void) sprintf(buf, "%d", diff);
 		return buf;
 	}
 
 	diff = (diff + 29) / 60;
 	if (diff <= 300) {
-		(void) sprintf(buf, "%ldm", (long int)diff);
+		(void) sprintf(buf, "%dm", diff);
 		return buf;
 	}
 
 	diff = (diff + 29) / 60;
 	if (diff <= 96) {
-		(void) sprintf(buf, "%ldh", (long int)diff);
+		(void) sprintf(buf, "%dh", diff);
 		return buf;
 	}
 
 	diff = (diff + 11) / 24;
-	(void) sprintf(buf, "%ldd", (long int)diff);
+	(void) sprintf(buf, "%dd", diff);
 	return buf;
 }
 
@@ -1264,14 +1264,14 @@ doprintpeers(pvl, associd, rstatus, datalen, data, fp)
 	int i;
 	int c;
 
-	u_long srcadr;
-	u_long dstadr;
-	u_long srcport;
+	U_LONG srcadr;
+	U_LONG dstadr;
+	U_LONG srcport;
 	char *dstadr_refid = "0.0.0.0";
-	u_long stratum;
-	long ppoll;
-	long hpoll;
-	u_long reach;
+	U_LONG stratum;
+	LONG ppoll;
+	LONG hpoll;
+	U_LONG reach;
 	l_fp estdelay;
 	l_fp estoffset;
 	l_fp estdisp;
@@ -1279,8 +1279,7 @@ doprintpeers(pvl, associd, rstatus, datalen, data, fp)
 	l_fp reftime;
 	l_fp ts;
 	u_char havevar[MAXHAVE];
-	u_long poll;
-	char type = '?';
+	U_LONG poll;
 	char refid_string[10];
 	extern struct ctl_var peer_var[];
 
@@ -1288,7 +1287,6 @@ doprintpeers(pvl, associd, rstatus, datalen, data, fp)
 	gettstamp(&ts);
 	
 	while (nextvar(&datalen, &data, &name, &value)) {
-		u_long dummy;
 		i = findvar(name, peer_var);
 		if (i == 0)
 			continue;	/* don't know this one */
@@ -1298,14 +1296,6 @@ doprintpeers(pvl, associd, rstatus, datalen, data, fp)
 				havevar[HAVE_SRCADR] = 1;
 			break;
 		case CP_DSTADR:
-			if (decodenetnum(value, &dummy)) {
-				dummy = ntohl(dummy);
-				type = ((dummy&0xf0000000)==0xe0000000) ? 'm' :
-				       ((dummy&0x000000ff)==0x000000ff) ? 'b' :
-				       ((dummy&0xffffffff)==0x7f000001) ? 'l' :
-				       ((dummy&0xffffffe0)==0x00000000) ? '-' :
-				       					  'u';
-			}
 			if (pvl == opeervarlist) {
 				if (decodenetnum(value, &dstadr)) {
 					havevar[HAVE_DSTADR] = 1;
@@ -1380,7 +1370,7 @@ doprintpeers(pvl, associd, rstatus, datalen, data, fp)
 		case CP_REFTIME:
 			havevar[HAVE_REFTIME] = 1;
 			if (!decodets(value, &reftime))
-				L_CLR(&reftime);
+				reftime.l_ui = reftime.l_uf = 0;
 			break;
 		default:
 			break;
@@ -1418,10 +1408,11 @@ doprintpeers(pvl, associd, rstatus, datalen, data, fp)
 	if (numhosts > 1)
 		(void) fprintf(fp, "%-*s ", maxhostlen, currenthost);
 	(void) fprintf(fp,
-	    "%c%-15.15s %-15.15s %2ld %c %4.4s %4ld  %3lo  %7.7s %8.7s %7.7s\n",
-	    c, nntohost(srcadr), dstadr_refid, stratum, type,
-	    when(&ts, &rec, &reftime), poll, reach,
-	    fixup(7, lfptoms(&estdelay, 2)), fixup(8, lfptoms(&estoffset, 3)),
+	    "%c%-15.15s %-15.15s %2d %4.4s %4d  %3o  %7.7s %7.7s %7.7s\n",
+	    c, nntohost(srcadr), dstadr_refid, stratum,
+	    when(&ts, &rec, &reftime),
+	    poll, reach, fixup(7, lfptoms(&estdelay, 2)),
+	    fixup(7, lfptoms(&estoffset, 2)),
 	    fixup(7, lfptoms(&estdisp, 2)));
 	return 1;
 }
@@ -1493,7 +1484,7 @@ dopeers(showall, fp)
 {
 	register int i;
 	char fullname[LENHOSTNAME];
-	u_long netnum;
+	U_LONG netnum;
 
 
 	if (!dogetassoc(fp))
@@ -1507,12 +1498,12 @@ dopeers(showall, fp)
 	if (numhosts > 1)
 		(void) fprintf(fp, "%-*.*s ", maxhostlen, maxhostlen, "host");
 	(void) fprintf(fp,
-"     remote           refid      st t when poll reach   delay   offset    disp\n");
+"     remote           refid      st when poll reach   delay  offset    disp\n");
 	if (numhosts > 1)
 		for (i = 0; i <= maxhostlen; ++i)
 			(void) fprintf(fp, "=");
 	(void) fprintf(fp,
-"==============================================================================\n");
+"===========================================================================\n");
 
 	for (i = 0; i < numassoc; i++) {
 		if (!showall &&
@@ -1567,9 +1558,9 @@ doopeers(showall, fp)
 		return;
 
 	(void) fprintf(fp,
-"     remote           local      st t when poll reach  delay  offset   disp\n");
+"     remote           local      st when poll reach  delay  offset   disp\n");
 	(void) fprintf(fp,
-"===========================================================================\n");
+"=========================================================================\n");
 
 	for (i = 0; i < numassoc; i++) {
 		if (!showall &&

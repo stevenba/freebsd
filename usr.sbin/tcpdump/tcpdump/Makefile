@@ -1,7 +1,7 @@
 #	@(#)Makefile	0.1 (RWGrimes) 3/24/93
 
 PROG=	tcpdump
-CFLAGS+=-DCSLIP -DPPP -I. -I${.CURDIR}/../../mrouted
+CFLAGS+=-DCSLIP -DPPP -I.
 MAN1=	tcpdump.1
 SRCS=	version.c addrtoname.c bpf_dump.c bpf_filter.c bpf_image.c etherent.c \
 	gencode.c inet.c md.c nametoaddr.c optimize.c os.c pcap.c \
@@ -13,8 +13,6 @@ SRCS=	version.c addrtoname.c bpf_dump.c bpf_filter.c bpf_image.c etherent.c \
 	tcplex.c util.c
 .PATH:	/sys/net
 CLEANFILES+=	tcpgram.c tcplex.c y.tab.h y.tab.c version.c version.h
-DPADD+=	${LIBL}
-LDADD+=	-ll
 
 version.c version.h: VERSION
 	rm -f version.c ; \

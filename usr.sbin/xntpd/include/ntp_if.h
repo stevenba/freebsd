@@ -12,7 +12,7 @@
 #include <time.h>
 #endif
 
-#if (defined(SOLARIS) && !defined(bsd)) || defined(SYS_SUNOS4)
+#if defined(SOLARIS)&&!defined(bsd)
 #include <sys/sockio.h>
 #endif
 

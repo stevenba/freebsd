@@ -26,7 +26,7 @@
 #include "uucp.h"
 
 #if USE_RCS_ID
-const char send_rcsid[] = "$Id: send.c,v 1.2 1994/05/07 18:13:57 ache Exp $";
+const char send_rcsid[] = "$Id: send.c,v 1.46 1994/04/10 23:13:29 ian Rel $";
 #endif
 
 #include <errno.h>
@@ -346,6 +346,9 @@ flocal_send_fail (qtrans, qcmd, qdaemon, zwhy)
 
   (void) fsysdep_did_work (qcmd->pseq);
 
+  if (qtrans != NULL)
+    usfree_send (qtrans);
+
   return TRUE;
 }
 
@@ -368,12 +371,8 @@ flocal_send_request (qtrans, qdaemon)
   /* Make sure the file meets any remote size restrictions.  */
   if (qdaemon->cmax_receive != -1
       && qdaemon->cmax_receive < qinfo->cbytes)
-    {
-      fret = flocal_send_fail (qtrans, &qtrans->s, qdaemon,
+    return flocal_send_fail (qtrans, &qtrans->s, qdaemon,
 			     "too large for receiver");
-      usfree_send (qtrans);
-      return fret;
-    }
 
   /* Make sure the file still exists--it may have been removed between
      the conversation startup and now.  After we have sent over the S
@@ -596,10 +595,7 @@ flocal_send_await_reply (qtrans, qdaemon, zdata, cdata)
 	{
 	  if (! flocal_send_fail ((struct stransfer *) NULL, &qtrans->s,
 				  qdaemon, zerr))
-	    {
-	      usfree_send (qtrans);
-	      return FALSE;
-	    }
+	    return FALSE;
 	}
 
       /* If the protocol does not support multiple channels, we can
@@ -1040,8 +1036,6 @@ fremote_rec_fail_send (qtrans, qdaemon)
   enum tfailure *ptinfo = (enum tfailure *) qtrans->pinfo;
   const char *z;
   boolean fret;
-  int ilocal = qtrans->ilocal;
-  int iremote = qtrans->iremote;
 
   switch (*ptinfo)
     {
@@ -1057,9 +1051,10 @@ fremote_rec_fail_send (qtrans, qdaemon)
       break;
     }
   
+  fret = (*qdaemon->qproto->pfsendcmd) (qdaemon, z, qtrans->ilocal,
+					qtrans->iremote);
   xfree (qtrans->pinfo);
   utransfree (qtrans);
-  fret = (*qdaemon->qproto->pfsendcmd) (qdaemon, z, ilocal, iremote);
   return fret;
 }
 

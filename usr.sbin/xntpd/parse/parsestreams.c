@@ -1,7 +1,7 @@
 /*
- * /src/NTP/REPOSITORY/v3/parse/parsestreams.c,v 3.22 1994/06/01 10:41:16 kardel Exp
+ * /src/NTP/REPOSITORY/v3/parse/parsestreams.c,v 3.19 1994/02/24 16:33:54 kardel Exp
  *  
- * parsestreams.c,v 3.22 1994/06/01 10:41:16 kardel Exp
+ * parsestreams.c,v 3.19 1994/02/24 16:33:54 kardel Exp
  *
  * STREAMS module for reference clocks
  * (SunOS4.x)
@@ -16,7 +16,7 @@
  */
 
 #ifndef lint
-static char rcsid[] = "parsestreams.c,v 3.22 1994/06/01 10:41:16 kardel Exp";
+static char rcsid[] = "parsestreams.c,v 3.19 1994/02/24 16:33:54 kardel Exp";
 #endif
 
 #include "sys/types.h"
@@ -195,7 +195,7 @@ int xxxinit(fc, vdp, vdi, vds)
 	}
       else
         {
-	  static char revision[] = "3.22";
+	  static char revision[] = "3.19";
 	  char *s, *S, *t;
 	  
 	  strncpy(ifm->f_name, mname, FMNAMESZ);
@@ -493,11 +493,6 @@ static int parseopen(q, dev, flag, sflag)
 #endif
   
   q->q_ptr = (caddr_t)kmem_alloc(sizeof(parsestream_t));
-  if (q->q_ptr == (caddr_t)0)
-    {
-      parseprintf(DD_OPEN,("parse: OPEN - FAILED - no memory\n")); 
-      return OPENFAIL;
-    }
   WR(q)->q_ptr = q->q_ptr;
   
   parse = (parsestream_t *) q->q_ptr;
@@ -1027,33 +1022,24 @@ static int init_zs_linemon(q, my_q)
        */
       szs = (struct savedzsops *) kmem_alloc(sizeof(struct savedzsops));
 
-      if (szs == (struct savedzsops *)0)
-	{
-	  parseprintf(DD_INSTALL, ("init_zs_linemon: CD monitor NOT installed - no memory\n"));
+      parsestream->parse_data   = (void *)szs;
 
-	  return 0;
-	}
-      else
-	{
-	  parsestream->parse_data   = (void *)szs;
+      s = splhigh();
 
-	  s = splhigh();
+      parsestream->parse_dqueue = q; /* remember driver */
 
-	  parsestream->parse_dqueue = q; /* remember driver */
+      szs->zsops            = *zs->zs_ops;
+      szs->zsops.zsop_xsint = (int (*)())zs_xsisr; /* place our bastard */
+      szs->oldzsops         = zs->zs_ops;
+      emergencyzs           = zs->zs_ops;
+      
+      zsopinit(zs, &szs->zsops); /* hook it up */
+      
+      (void) splx(s);
 
-	  szs->zsops            = *zs->zs_ops;
-	  szs->zsops.zsop_xsint = (int (*)())zs_xsisr; /* place our bastard */
-	  szs->oldzsops         = zs->zs_ops;
-	  emergencyzs           = zs->zs_ops;
-	  
-	  zsopinit(zs, &szs->zsops); /* hook it up */
-	  
-	  (void) splx(s);
+      parseprintf(DD_INSTALL, ("init_zs_linemon: CD monitor installed\n"));
 
-	  parseprintf(DD_INSTALL, ("init_zs_linemon: CD monitor installed\n"));
-
-	  return 1;
-	}
+      return 1;
     }
 }
 
@@ -1147,7 +1133,7 @@ static void zs_xsisr(zs)
       /*
        * logical state
        */
-      status = cd_invert ? (zsstatus & ZSRR0_SYNC) == 0 : (zsstatus & ZSRR0_SYNC) != 0;
+      status = cd_invert ? (zsstatus & (ZSRR0_CD|ZSRR0_SYNC)) == 0 : (zsstatus & (ZSRR0_CD|ZSRR0_SYNC)) != 0;
 
 #ifdef PPS_SYNC
       if (status)
@@ -1300,17 +1286,8 @@ static void zs_xsisr(zs)
  * History:
  *
  * parsestreams.c,v
- * Revision 3.22  1994/06/01  10:41:16  kardel
- * CD seems to happen on ZSRR0_SYNC
- *
- * Revision 3.21  1994/06/01  08:18:57  kardel
- * look at CD only
- *
- * Revision 3.20  1994/05/30  09:57:43  kardel
- * kmem_alloc checking
- *
  * Revision 3.19  1994/02/24  16:33:54  kardel
- * CD events can olso be posted on sync flag
+ * CD events can also be posted on sync flag
  *
  * Revision 3.18  1994/02/24  14:12:58  kardel
  * initial PPS_SYNC support version

@@ -1,4 +1,4 @@
-/*
+/* makePC2.c,v 3.1 1993/07/06 01:05:01 jbj Exp
  * makePC2 - build custom permutted choice 2 tables
  */
 
@@ -12,8 +12,8 @@
 char *progname;
 int debug;
 
-static	void	permc	P((u_char *, u_long *));
-static	void	permd	P((u_char *, u_long *));
+static	void	permc	P((u_char *, U_LONG *));
+static	void	permd	P((u_char *, U_LONG *));
 static	void	doit	P((void));
 
 /*
@@ -71,7 +71,7 @@ static u_char PC2_D[24] = {
 	17, 13, 21,  7,  0,  3
 };
 
-u_long masks[4] = { 0x40000000, 0x400000, 0x4000, 0x40 };
+U_LONG masks[4] = { 0x40000000, 0x400000, 0x4000, 0x40 };
 
 
 /*
@@ -80,11 +80,11 @@ u_long masks[4] = { 0x40000000, 0x400000, 0x4000, 0x40 };
 static void
 permc(bits, resp)
 	u_char *bits;
-	u_long *resp;
+	U_LONG *resp;
 {
 	register int part;
 	register int i;
-	register u_long mask;
+	register U_LONG mask;
 	u_char res[24];
 
 	memset((char *)res, 0, sizeof res);
@@ -110,11 +110,11 @@ permc(bits, resp)
 static void
 permd(bits, resp)
 	u_char *bits;
-	u_long *resp;
+	U_LONG *resp;
 {
 	register int part;
 	register int i;
-	register u_long mask;
+	register U_LONG mask;
 	u_char res[24];
 
 	memset((char *)res, 0, sizeof res);
@@ -165,12 +165,12 @@ doit()
 {
 	int i;
 	int comb;
-	u_long res;
+	U_LONG res;
 	u_char bits[28];
 
 	memset((char *)bits, 0, sizeof bits);
 
-	printf("static u_long PC2_C[4][64] = {");
+	printf("static U_LONG PC2_C[4][64] = {");
 	for (i = 0; i < 4; i++) {
 		for (comb = 0; comb < 64; comb++) {
 			if (comb & 0x20)
@@ -203,7 +203,7 @@ doit()
 		}
 	}
 
-	printf("static u_long PC2_D[4][64] = {");
+	printf("static U_LONG PC2_D[4][64] = {");
 	for (i = 0; i < 4; i++) {
 		for (comb = 0; comb < 64; comb++) {
 			if (comb & 0x20)
