@@ -1,8 +1,10 @@
 # $FreeBSD$
 
-GCCDIR=	${.CURDIR}/../../../contrib/gcc.295
+GCCDIR=		${.CURDIR}/../../../contrib/gcc
 
-.if ${MACHINE_ARCH} == "alpha"
+TARGET_ARCH?=	${MACHINE_ARCH}
+
+.if ${TARGET_ARCH} == "alpha"
 .PATH: ${GCCDIR}/config/alpha
 SRCS=		crtbegin.s crtend.s
 UGLYHACK=	-x assembler
@@ -13,7 +15,9 @@ SRCS=		crtstuff.c tm.h
 
 OBJS=		crtbegin.o crtend.o
 SOBJS=		crtbegin.So crtend.So
-CFLAGS+=	-I${GCCDIR}/config -I. -DIN_GCC \
+CFLAGS+=	-I${GCCDIR}/config -I${GCCDIR} -I. \
+		-I${.CURDIR}/../../usr.bin/cc/cc_tools -I../../usr.bin/cc/cc_tools \
+		-DIN_GCC \
 		-finhibit-size-directive -fno-inline-functions \
 		-fno-exceptions -fno-omit-frame-pointer
 NOMAN=		true
@@ -26,7 +30,7 @@ CRTS_CFLAGS=	-DCRTSTUFFS_O ${PICFLAG}
 
 all: ${OBJS} ${SOBJS}
 
-.if ${MACHINE_ARCH} == "alpha"
+.if ${TARGET_ARCH} == "alpha"
 crtbegin.o crtbegin.So:	crtbegin.s
 crtend.o crtend.So:	crtend.s
 .for PART in begin end
@@ -56,15 +60,25 @@ crtend.So:
 
 #	KEEP THIS IN SYNC with src/gnu/usr.bin/cc/cc_tools/Makefile !!
 tm.h:
-	echo '#include "${MACHINE_ARCH}/${MACHINE_ARCH}.h"'	> ${.TARGET}
+	echo '#include "gansidecl.h"'			> ${.TARGET}
+	echo '#include "${MACHINE_ARCH}/${MACHINE_ARCH}.h"'	>> ${.TARGET}
 .if ${MACHINE_ARCH} == "i386"
-	echo '#include "${MACHINE_ARCH}/att.h"'			>> ${.TARGET}
+	echo '#include "${MACHINE_ARCH}/att.h"'		>> ${.TARGET}
 .endif
-	echo '#include <freebsd.h>'				>> ${.TARGET}
-	echo '#include "${MACHINE_ARCH}/freebsd.h"'		>> ${.TARGET}
+	echo '#include <freebsd-native.h>'		>> ${.TARGET}
+	echo '#include <freebsd.h>'			>> ${.TARGET}
+.if exists(${MACHINE_ARCH}/config/${MACHINE_ARCH}/elf.h)
+	echo '#include "${MACHINE_ARCH}/elf.h"'		>> ${.TARGET}
+.endif
+	echo '#include "${MACHINE_ARCH}/freebsd.h"'	>> ${.TARGET}
 .if ${MACHINE_ARCH} == "i386"
-	echo '#include "${MACHINE_ARCH}/perform.h"'		>> ${.TARGET}
+	echo '#include "${MACHINE_ARCH}/perform.h"'	>> ${.TARGET}
 .endif
+	echo '#include "defaults.h"'			>> ${.TARGET}
+	echo '#ifndef GENERATOR_FILE'			>> ${.TARGET}
+	echo '#include "insn-codes.h"'			>> ${.TARGET}
+	echo '#include "insn-flags.h"'			>> ${.TARGET}
+	echo '#endif'					>> ${.TARGET}
 
 realinstall:
 .for file in ${OBJS} ${SOBJS}
