@@ -10,8 +10,6 @@
  * license.
  *
  * See README and COPYING for more details.
- *
- * $FreeBSD$
  */
 
 #include "includes.h"
@@ -441,9 +439,10 @@ wpa_supplicant_select_bss(struct wpa_supplicant *wpa_s, struct wpa_ssid *group,
 				wpa_printf(MSG_DEBUG, "   skip - disabled");
 				continue;
 			}
-			if (bss->ssid_len != ssid->ssid_len ||
-			    os_memcmp(bss->ssid, ssid->ssid,
-				      bss->ssid_len) != 0) {
+			if (ssid->ssid_len != 0 &&
+			    (bss->ssid_len != ssid->ssid_len ||
+			     os_memcmp(bss->ssid, ssid->ssid,
+				       bss->ssid_len) != 0)) {
 				wpa_printf(MSG_DEBUG, "   skip - "
 					   "SSID mismatch");
 				continue;
@@ -466,8 +465,8 @@ wpa_supplicant_select_bss(struct wpa_supplicant *wpa_s, struct wpa_ssid *group,
 			}
 
 			if ((ssid->key_mgmt & 
-			     (WPA_KEY_MGMT_IEEE8021X | WPA_KEY_MGMT_PSK)) ||
-			    bss->wpa_ie_len != 0 || bss->rsn_ie_len != 0) {
+			     (WPA_KEY_MGMT_IEEE8021X | WPA_KEY_MGMT_PSK)) &&
+			    (bss->wpa_ie_len != 0 || bss->rsn_ie_len != 0)) {
 				wpa_printf(MSG_DEBUG, "   skip - "
 					   "WPA network");
 				continue;
@@ -517,7 +516,7 @@ static void wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s)
 
 	wpa_supplicant_dbus_notify_scan_results(wpa_s);
 
-	if (wpa_s->conf->ap_scan == 2)
+	if (wpa_s->conf->ap_scan == 2 || wpa_s->disconnected)
 		return;
 	results = wpa_s->scan_results;
 	num = wpa_s->num_scan_results;
@@ -804,18 +803,6 @@ wpa_supplicant_event_michael_mic_failure(struct wpa_supplicant *wpa_s,
 }
 
 
-#ifdef CONFIG_TERMINATE_ONLASTIF
-static int any_interfaces(struct wpa_supplicant *head)
-{
-	struct wpa_supplicant *wpa_s;
-
-	for (wpa_s = head; wpa_s != NULL; wpa_s = wpa_s->next)
-		if (!wpa_s->interface_removed)
-			return 1;
-	return 0;
-}
-#endif /* CONFIG_TERMINATE_ONLASTIF */
-
 static void
 wpa_supplicant_event_interface_status(struct wpa_supplicant *wpa_s,
 				      union wpa_event_data *data)
@@ -840,11 +827,6 @@ wpa_supplicant_event_interface_status(struct wpa_supplicant *wpa_s,
 		wpa_supplicant_mark_disassoc(wpa_s);
 		l2_packet_deinit(wpa_s->l2);
 		wpa_s->l2 = NULL;
-#ifdef CONFIG_TERMINATE_ONLASTIF
-		/* check if last interface */
-		if (!any_interfaces(wpa_s->global->ifaces))
-			eloop_terminate();
-#endif /* CONFIG_TERMINATE_ONLASTIF */
 		break;
 	}
 }

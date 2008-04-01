@@ -10,8 +10,6 @@
  * license.
  *
  * See README and COPYING for more details.
- *
- * $FreeBSD$
  */
 
 #include "includes.h"

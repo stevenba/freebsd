@@ -1,5 +1,3 @@
-/* $FreeBSD$ */
-
 /*
  * hostapd / EAP Standalone Authenticator state machine (RFC 4137)
  * Copyright (c) 2004-2005, Jouni Malinen <j@w1.fi>

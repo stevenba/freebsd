@@ -1,5 +1,3 @@
-/* $FreeBSD$ */
-
 /*
  * hostapd / IEEE 802.1X Authenticator
  * Copyright (c) 2002-2005, Jouni Malinen <j@w1.fi>
